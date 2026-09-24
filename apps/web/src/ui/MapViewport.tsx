@@ -2,11 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import type { Vec3 } from '@/common/geometry';
 import { loadMapBundle, mapLoadErrorCode, readMapPoiData, type MapBundle } from '@/data';
 import type { MapViewer, ScreenAnchor } from '@/engine';
-import { QUALITY_PIXEL_RATIO, useUiStore } from '@/state/uiStore';
+import { MinimapHudContainer } from '@/bigmap';
+import { FRAME_LIMIT_FPS, QUALITY_PIXEL_RATIO, useUiStore } from '@/state/uiStore';
 import { useFloorStore } from '@/state/floorStore';
 import { useMapDataStore } from '@/state/mapDataStore';
 import { useMapStore } from '@/state/mapStore';
+import { useNavStore } from '@/state/navStore';
 import { usePoiStore } from '@/state/poiStore';
+import { NavPathHud } from './NavPathHud';
 import { PoiOverlay, type PoiProjector } from './PoiOverlay';
 
 /**
@@ -30,9 +33,14 @@ export function MapViewport() {
   const [viewer, setViewer] = useState<MapViewer | null>(null);
   const [projector, setProjector] = useState<PoiProjector>(null);
   const mapId = useMapStore((state) => state.mapId);
+  const mapStatus = useMapStore((state) => state.status);
   const quality = useUiStore((state) => state.quality);
+  const fov = useUiStore((state) => state.fov);
+  const sensitivity = useUiStore((state) => state.sensitivity);
+  const frameLimit = useUiStore((state) => state.frameLimit);
 
   // 引擎装载（一次）：产出就绪 promise 供数据加载衔接（StrictMode 双挂载安全）。
+  // 抗锯齿是渲染器创建参数，只在装载时读取一次；变更需重建视口（重启页面）。
   useEffect(() => {
     let disposed = false;
     const ready = (async (): Promise<MapViewer | null> => {
@@ -44,7 +52,9 @@ export function MapViewport() {
       if (disposed) {
         return null;
       }
-      const created = new MapViewer(canvas);
+      const created = new MapViewer(canvas, {
+        antialias: useUiStore.getState().antialias,
+      });
       setViewer(created);
       setProjector(() => (world: Vec3): ScreenAnchor | null => created.projectPoi(world));
       return created;
@@ -137,6 +147,84 @@ export function MapViewport() {
     );
   }, [viewer, quality]);
 
+  // 帧率上限：运行时调整渲染循环节流。
+  useEffect(() => {
+    if (viewer === null) {
+      return;
+    }
+    viewer.sceneManager.setFrameLimit(FRAME_LIMIT_FPS[frameLimit]);
+  }, [viewer, frameLimit]);
+
+  // 相机设置：FOV/灵敏度即时生效；换图后相机重建，依赖地图就绪状态再次应用。
+  useEffect(() => {
+    if (viewer === null) {
+      return;
+    }
+    viewer.applyCameraSettings({ fov, sensitivity });
+  }, [viewer, fov, sensitivity, mapStatus]);
+
+  // 回出生点：注册到 store，设置面板触发。
+  useEffect(() => {
+    if (viewer === null) {
+      return;
+    }
+    useUiStore.getState().registerRespawn(() => {
+      viewer.respawn();
+    });
+    return () => {
+      useUiStore.getState().registerRespawn(null);
+    };
+  }, [viewer]);
+
+  // 寻路：订阅 navStore 请求，懒加载导航数据后 A* 求解；
+  // 起点取相机注视点（模拟器语义：漫游者即相机），终点为请求目标点。
+  useEffect(() => {
+    if (viewer === null) {
+      return;
+    }
+    let cancelled = false;
+    const unsubscribe = useNavStore.subscribe((state, prev) => {
+      if (state.requestSeq === prev.requestSeq || state.requestTarget === null) {
+        return;
+      }
+      const seq = state.requestSeq;
+      const target = state.requestTarget;
+      void (async () => {
+        try {
+          const available = await viewer.ensureNavMesh();
+          if (cancelled || !available) {
+            useNavStore.getState().setUnavailable();
+            return;
+          }
+          const origin = viewer.controls.target;
+          const from = { x: origin.x, y: origin.y, z: origin.z };
+          const path = viewer.findPath(from, target);
+          if (cancelled || useNavStore.getState().requestSeq !== seq) {
+            return;
+          }
+          if (path === null) {
+            useNavStore.getState().setUnreachable();
+            viewer.setNavPath(null);
+            return;
+          }
+          useNavStore.getState().setReady(path.points, path.distance);
+          viewer.setNavPath(path.points);
+        } catch (error) {
+          console.error('寻路失败', error);
+          if (!cancelled) {
+            useNavStore.getState().setUnavailable();
+          }
+        }
+      })();
+    });
+    return () => {
+      cancelled = true;
+      unsubscribe();
+      viewer.clearNavPath();
+      useNavStore.getState().clear();
+    };
+  }, [viewer]);
+
   // 搜索/气泡“定位”：轨道相机缓动飞行（用户输入可打断）。
   useEffect(() => {
     if (viewer === null) {
@@ -204,6 +292,8 @@ export function MapViewport() {
     <div className="map-viewport">
       <canvas ref={canvasRef} className="map-canvas" />
       <PoiOverlay projector={projector} />
+      <MinimapHudContainer />
+      <NavPathHud />
       <LoadProgressBar />
     </div>
   );

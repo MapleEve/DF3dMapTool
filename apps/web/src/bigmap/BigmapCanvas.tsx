@@ -4,6 +4,7 @@ import {
   pipelinePixelToWorld,
   pipelineWorldToUv,
 } from './project';
+import { MAX_ZOOM_INDEX, MIN_ZOOM_INDEX, nextStepIndex, ZOOM_STEPS } from './zoomSteps';
 import type { BigmapCalibration, WorldXZ } from './types';
 
 /** 2D 底图上的 POI 标记（图标位图由父层解析后传入）。 */
@@ -22,10 +23,12 @@ export interface BigmapRegionLabel {
   readonly name: string;
 }
 
-/** 父层可持有的命令句柄（缩放按钮/复位）。 */
+/** 父层可持有的命令句柄（缩放按钮/滑杆/复位）。 */
 export interface BigmapController {
   zoomIn(): void;
   zoomOut(): void;
+  /** 直接跳到缩放档位（比例尺滑杆驱动）。 */
+  setZoomStep(index: number): void;
   resetView(): void;
 }
 
@@ -37,34 +40,46 @@ export interface BigmapCanvasProps {
   calibration: BigmapCalibration | null;
   pois: readonly BigmapPoiMarker[];
   regions: readonly BigmapRegionLabel[];
+  /** 选中的区域（高亮显示；与 POI 选中互不干扰）。 */
+  selectedRegionId?: string | null;
   playerXZ: WorldXZ | null;
   /** 视角朝向（弧度）：0 = 画面上方（世界 -Z），正值顺时针（东）。 */
   playerYaw: number | null;
   marker: WorldXZ | null;
   onSelectPoi: (poiId: string | null) => void;
   onPlaceMarker: (world: WorldXZ) => void;
+  /** 区域名点击（高亮 + 3D 定位）；null 表示清除选中（点击空白）。 */
+  onSelectRegion?: (regionId: string | null) => void;
+  /** 缩放档位变化回调（滚轮/按钮/滑杆/复位共用，供滑杆回显）。 */
+  onZoomChange?: (stepIndex: number) => void;
   /** 外部命令句柄挂载点。 */
   controllerRef?: { current: BigmapController | null };
 }
 
 interface ViewState {
-  /** 相对“适配窗口”基准的缩放倍数。 */
+  /** 相对“适配窗口”基准的缩放倍数（恒为 ZOOM_STEPS 档位值）。 */
   zoom: number;
   /** 画布 CSS 像素坐标系下的平移。 */
   offsetX: number;
   offsetY: number;
 }
 
-const MIN_ZOOM = 1;
-const MAX_ZOOM = 8;
-const ZOOM_STEP = 1.25;
 const POI_HIT_RADIUS_PX = 16;
+const REGION_HIT_PAD_PX = 6;
 const POI_DRAW_SIZE = 22;
 const CLICK_SLOP_PX = 4;
 
+/** 屏幕空间命中用的区域标注盒（绘制时记录）。 */
+interface RegionHitBox {
+  readonly id: string;
+  readonly x: number;
+  readonly y: number;
+  readonly halfWidth: number;
+}
+
 /**
  * 2D 俯视大地图画布：单层烘焙整图 + 覆盖层（POI/区域/视角箭头/标记），
- * 仿射缩放平移（滚轮以光标为锚、拖拽平移），无瓦片、无第三方地图库。
+ * 仿射缩放平移（滚轮以光标为锚、拖拽平移、档位化缩放），无瓦片、无第三方地图库。
  */
 export function BigmapCanvas(props: BigmapCanvasProps) {
   const {
@@ -73,11 +88,14 @@ export function BigmapCanvas(props: BigmapCanvasProps) {
     calibration,
     pois,
     regions,
+    selectedRegionId,
     playerXZ,
     playerYaw,
     marker,
     onSelectPoi,
     onPlaceMarker,
+    onSelectRegion,
+    onZoomChange,
     controllerRef,
   } = props;
 
@@ -93,6 +111,12 @@ export function BigmapCanvas(props: BigmapCanvasProps) {
     moved: boolean;
   } | null>(null);
   const sizeRef = useRef<{ width: number; height: number }>({ width: 0, height: 0 });
+  const regionHitsRef = useRef<RegionHitBox[]>([]);
+  // 回调经 ref 转发，避免绘制闭包与命令句柄因回调身份变化反复重建。
+  const onSelectRegionRef = useRef(onSelectRegion);
+  onSelectRegionRef.current = onSelectRegion;
+  const onZoomChangeRef = useRef(onZoomChange);
+  onZoomChangeRef.current = onZoomChange;
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
@@ -120,6 +144,7 @@ export function BigmapCanvas(props: BigmapCanvasProps) {
 
     const image = imageRef.current;
     if (image === null || imageSize === null || calibration === null) {
+      regionHitsRef.current = [];
       return;
     }
     const view = viewRef.current;
@@ -136,20 +161,33 @@ export function BigmapCanvas(props: BigmapCanvasProps) {
     ctx.imageSmoothingEnabled = true;
     ctx.drawImage(image, view.offsetX, view.offsetY, drawW, drawH);
 
-    // 区域名标注层：屏幕空间描边文字，字号不随缩放变化。
+    // 区域名标注层：屏幕空间描边文字，字号不随缩放变化；选中区域高亮。
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.font = '600 13px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif';
+    regionHitsRef.current = [];
     for (const region of regions) {
       const point = toScreen(region.world);
       if (point.x < -60 || point.x > width + 60 || point.y < -20 || point.y > height + 20) {
         continue;
       }
+      const selected = region.id === selectedRegionId;
+      ctx.font = selected
+        ? '700 14px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif'
+        : '600 13px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif';
       ctx.lineWidth = 3;
       ctx.strokeStyle = 'rgba(5, 8, 12, 0.85)';
       ctx.strokeText(region.name, point.x, point.y);
-      ctx.fillStyle = 'rgba(219, 231, 243, 0.92)';
+      ctx.fillStyle = selected ? '#5aa9ff' : 'rgba(219, 231, 243, 0.92)';
       ctx.fillText(region.name, point.x, point.y);
+      if (selected) {
+        ctx.beginPath();
+        ctx.arc(point.x, point.y, 7, 0, Math.PI * 2);
+        ctx.strokeStyle = '#5aa9ff';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
+      const halfWidth = ctx.measureText(region.name).width / 2 + REGION_HIT_PAD_PX;
+      regionHitsRef.current.push({ id: region.id, x: point.x, y: point.y, halfWidth });
     }
 
     // POI 图标层。
@@ -228,9 +266,9 @@ export function BigmapCanvas(props: BigmapCanvasProps) {
       ctx.fillStyle = '#dbe7f3';
       ctx.fillText(label, point.x + 10, point.y - 8);
     }
-  }, [calibration, imageSize, marker, playerXZ, playerYaw, pois, regions]);
+  }, [calibration, imageSize, marker, playerXZ, playerYaw, pois, regions, selectedRegionId]);
 
-  // 底图加载：换图/换层后复位视图。
+  // 底图加载：换图/换层后复位视图（含缩放档位回调归零）。
   useEffect(() => {
     if (imageUrl === null) {
       imageRef.current = null;
@@ -248,6 +286,7 @@ export function BigmapCanvas(props: BigmapCanvasProps) {
         }
         imageRef.current = image;
         viewRef.current = { zoom: 1, offsetX: 0, offsetY: 0 };
+        onZoomChangeRef.current?.(MIN_ZOOM_INDEX);
         draw();
       })
       .catch(() => {
@@ -286,10 +325,12 @@ export function BigmapCanvas(props: BigmapCanvasProps) {
     draw();
   }, [draw]);
 
-  const zoomAt = useCallback(
-    (factor: number, anchorX: number | null, anchorY: number | null) => {
+  /** 跳到缩放档位（锚点为中心或光标位置）。 */
+  const zoomToStep = useCallback(
+    (index: number, anchorX: number | null, anchorY: number | null) => {
       const view = viewRef.current;
-      const nextZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, view.zoom * factor));
+      const clamped = Math.min(MAX_ZOOM_INDEX, Math.max(MIN_ZOOM_INDEX, Math.round(index)));
+      const nextZoom = ZOOM_STEPS[clamped] ?? 1;
       if (nextZoom === view.zoom) {
         return;
       }
@@ -309,17 +350,19 @@ export function BigmapCanvas(props: BigmapCanvasProps) {
       return;
     }
     controllerRef.current = {
-      zoomIn: () => zoomAt(ZOOM_STEP, null, null),
-      zoomOut: () => zoomAt(1 / ZOOM_STEP, null, null),
+      zoomIn: () => zoomToStep(nextStepIndex(viewRef.current.zoom, 1), null, null),
+      zoomOut: () => zoomToStep(nextStepIndex(viewRef.current.zoom, -1), null, null),
+      setZoomStep: (index) => zoomToStep(index, null, null),
       resetView: () => {
         viewRef.current = { zoom: 1, offsetX: 0, offsetY: 0 };
+        onZoomChangeRef.current?.(MIN_ZOOM_INDEX);
         draw();
       },
     };
     return () => {
       controllerRef.current = null;
     };
-  }, [controllerRef, zoomAt, draw]);
+  }, [controllerRef, zoomToStep, draw]);
 
   /** CSS 像素 → 底图 UV（含当前视图变换）。 */
   const screenToUv = useCallback(
@@ -388,7 +431,7 @@ export function BigmapCanvas(props: BigmapCanvasProps) {
     if (drag === null || drag.pointerId !== event.pointerId || drag.moved || calibration === null) {
       return;
     }
-    // 命中检测：半径内最近的 POI 优先。
+    // 命中检测：半径内最近的 POI 优先，其次区域名标注盒。
     const canvas = event.currentTarget;
     const rect = canvas.getBoundingClientRect();
     const px = event.clientX - rect.left;
@@ -412,11 +455,18 @@ export function BigmapCanvas(props: BigmapCanvasProps) {
         return;
       }
     }
+    for (const hit of regionHitsRef.current) {
+      if (Math.abs(px - hit.x) <= hit.halfWidth && Math.abs(py - hit.y) <= 10) {
+        onSelectRegionRef.current?.(hit.id);
+        return;
+      }
+    }
     const uv = screenToUv(event.clientX, event.clientY);
     if (uv === null) {
       return;
     }
     onSelectPoi(null);
+    onSelectRegionRef.current?.(null);
     onPlaceMarker(
       pipelinePixelToWorld(
         { x: uv.u * calibration.imageWidthPx, y: uv.v * calibration.imageHeightPx },
@@ -428,7 +478,8 @@ export function BigmapCanvas(props: BigmapCanvasProps) {
   const handleWheel = (event: ReactWheelEvent<HTMLCanvasElement>) => {
     event.preventDefault();
     const rect = event.currentTarget.getBoundingClientRect();
-    zoomAt(event.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP, event.clientX - rect.left, event.clientY - rect.top);
+    const direction = event.deltaY < 0 ? 1 : -1;
+    zoomToStep(nextStepIndex(viewRef.current.zoom, direction), event.clientX - rect.left, event.clientY - rect.top);
   };
 
   const handleContextMenu = (event: React.MouseEvent<HTMLCanvasElement>) => {

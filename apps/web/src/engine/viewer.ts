@@ -1,7 +1,8 @@
 import { Group } from 'three';
 import type { DmapLoader } from '@df3dmaptool/dmap';
+import { AssetFetchError } from './assets';
 import type { Vec3 } from '@/common/geometry';
-import type { MapId } from '@/map';
+import type { MapCode, MapId } from '@/map';
 import { getMapById } from '@/map';
 import { DmapMapBundle, readSceneDoc, type SceneDoc } from './mapBundle';
 import { connectFloorStore } from './floorBinding';
@@ -11,6 +12,9 @@ import { MapSceneLayer } from './mapScene';
 import { projectToScreen, type ScreenAnchor } from './poiProjector';
 import type { ChunkProgressListener, ChunkStreamStats } from './mapScene';
 import { SceneManager } from './SceneManager';
+import { NavPathLayer } from './navmesh/navPathLayer';
+import { openNavMesh } from './navmesh/loader';
+import type { NavMesh, NavPath } from './navmesh/navmesh';
 
 const CAMERA_LAYER_ID = 'camera-controls';
 
@@ -37,6 +41,12 @@ export interface ViewerLoadState {
   readonly stats: ChunkStreamStats | null;
 }
 
+/** 视口创建选项（渲染器创建参数，创建后不可变更）。 */
+export interface MapViewerOptions {
+  /** 抗锯齿；缺省开启。 */
+  readonly antialias?: boolean;
+}
+
 export class MapViewer {
   readonly #manager: SceneManager;
   readonly #floorManager = new FloorManager({ dimInactive: true, dimOpacity: 0.18 });
@@ -45,9 +55,16 @@ export class MapViewer {
   #bundle: DmapMapBundle | null = null;
   #unsubscribeFloor: (() => void) | null = null;
   #sceneDoc: SceneDoc | null = null;
+  #mapCode: MapCode | null = null;
+  #navMesh: NavMesh | null = null;
+  #navMeshPromise: Promise<NavMesh | null> | null = null;
+  #navPathLayer: NavPathLayer | null = null;
 
-  constructor(canvas: HTMLCanvasElement) {
-    this.#manager = new SceneManager(canvas, { far: 6000 });
+  constructor(canvas: HTMLCanvasElement, options: MapViewerOptions = {}) {
+    this.#manager = new SceneManager(canvas, {
+      far: 6000,
+      antialias: options.antialias ?? true,
+    });
   }
 
   get sceneManager(): SceneManager {
@@ -101,6 +118,7 @@ export class MapViewer {
     };
     this.#controls = new MapCameraControls(this.#manager.camera, this.#manager.canvas, limits);
     this.#controls.frameBounds(limits.bounds);
+    this.#mapCode = definition.code;
 
     // 相机控制先于地图图层每帧更新：阻尼/飞行/钳制后的相机状态
     // 再参与流式规划，避免视锥滞后一帧
@@ -137,6 +155,14 @@ export class MapViewer {
       this.#manager.removeLayer(this.#mapLayer.id);
       this.#mapLayer = null;
     }
+    this.clearNavPath();
+    if (this.#navPathLayer !== null) {
+      this.#manager.removeLayer(this.#navPathLayer.id);
+      this.#navPathLayer = null;
+    }
+    this.#navMesh = null;
+    this.#navMeshPromise = null;
+    this.#mapCode = null;
     this.#controls?.dispose();
     this.#controls = null;
     this.#bundle?.dispose();
@@ -160,6 +186,92 @@ export class MapViewer {
     }
     void this.#controls.flyTo(target, distance);
     return true;
+  }
+
+  /**
+   * 应用相机设置（FOV/灵敏度，设置面板暴露项）。
+   * 地图未就绪（controls 尚未创建）时安全忽略；换图后由调用方再次应用。
+   */
+  applyCameraSettings(settings: { readonly fov?: number; readonly sensitivity?: number }): void {
+    const controls = this.#controls;
+    if (controls === null) {
+      return;
+    }
+    if (settings.fov !== undefined) {
+      controls.setFov(settings.fov);
+    }
+    if (settings.sensitivity !== undefined) {
+      controls.setSensitivity(settings.sensitivity);
+    }
+  }
+
+  /** 回出生点：复位到进场取景位；地图未加载时返回 false。 */
+  respawn(): boolean {
+    if (this.#controls === null) {
+      return false;
+    }
+    this.#controls.respawn();
+    return true;
+  }
+
+  /**
+   * 确保当前地图的导航网格已就绪（首次调用时拉取并解析加密导航容器）。
+   * 返回 false 表示该图无导航数据（未随应用分发）；解析/校验错误向上抛出。
+   */
+  async ensureNavMesh(): Promise<boolean> {
+    if (this.#navMesh !== null) {
+      return true;
+    }
+    const code = this.#mapCode;
+    if (code === null) {
+      return false;
+    }
+    this.#navMeshPromise ??= openNavMesh(`/assets/${code}.nav.dmap`)
+      .then((navMesh) => {
+        this.#navMesh = navMesh;
+        if (navMesh !== null && this.#navPathLayer === null) {
+          const layer = new NavPathLayer();
+          this.#manager.addLayer(layer);
+          this.#navPathLayer = layer;
+        }
+        return navMesh;
+      })
+      .catch((error: unknown) => {
+        // 数据包不存在是常态（部分地图未内置导航数据）：缓存 null 避免反复请求
+        if (error instanceof AssetFetchError) {
+          this.#navMesh = null;
+          return null;
+        }
+        this.#navMeshPromise = null;
+        throw error;
+      });
+    return (await this.#navMeshPromise) !== null;
+  }
+
+  /** 导航网格是否已就绪。 */
+  get navMeshReady(): boolean {
+    return this.#navMesh !== null;
+  }
+
+  /**
+   * A* 实时寻路（世界系两点）；导航网格未就绪时返回 null。
+   * 源点/终点不在可走区域时自动吸附到最近可走点。
+   */
+  findPath(from: Vec3, to: Vec3): NavPath | null {
+    if (this.#navMesh === null) {
+      return null;
+    }
+    return this.#navMesh.findPath(from, to);
+  }
+
+  /** 显示/清空 3D 路径可视化。 */
+  setNavPath(points: readonly Vec3[] | null): void {
+    this.#navPathLayer?.setPath(points);
+  }
+
+  /** 清空路径显示。 */
+  clearNavPath(): void {
+    this.#navPathLayer?.setPath(null);
   }
 
   dispose(): void {

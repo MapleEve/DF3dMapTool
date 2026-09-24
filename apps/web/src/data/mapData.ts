@@ -7,12 +7,27 @@ import type { MapBundle } from './manifest';
 /**
  * 数据包 → 运行时视图数据的派生层。
  *
+ * 容器内 JSON 为管线清洗后的稳定形态：
+ * - poi.json 仅保留运行时消费字段；图标/贴图文件为内容 hash 命名，索引（icons/index.json、
+ *   minimap/index.json）保留原业务键用于查找；
+ * - configs 各表仅保留本文件 Raw 类型声明的字段；
+ * - 语言键值已中性化（`poi.<id>.*` / `region.<Id>`），不参与 i18n 查找。
+ *
  * 世界系口径（全应用统一为“管线世界系”：右手、Y 向上、源数据已做 Z 镜像）：
  * - 数据包内 POI 坐标与 2D 楼层标定（map2d.json）已是管线世界系，直接使用；
  * - 配置表（区域表 / 出生点）为源世界系（Z 未镜像），此处统一做 z → −z 归一。
  */
 
-/** poi.json 的原始条目形态。 */
+/**
+ * poi.json 的原始条目形态（管线清洗后的稳定键位）。
+ * - 语言键已中性化：locationKey 非空时形如 `poi.<id>.location`，descriptionKey
+ *   非空时形如 `poi.<id>.description`（源数据绝大多数 descriptionKey 为空串）；
+ *   展示一律使用 location/description 明文，键值不参与翻译查找。
+ * - 源数据存在 location/locationKey/subTitle 全空的标注（各图均有、多为批量物资
+ *   点），displayName 按 location → description → 物品名 兜底，保证检索可命中。
+ * - iconFile 是图标资产的包内路径（hash 文件名）；该标注没有独立图标资产时为 null，
+ *   派生层归一为 undefined，由调用方走占位渲染。
+ */
 export interface RawPoi {
   readonly id: number;
   readonly mapId: number;
@@ -27,15 +42,14 @@ export interface RawPoi {
   readonly floor: number;
   readonly worldPos: readonly [number, number, number];
   readonly icon: string;
-  readonly iconFile: string;
+  readonly iconFile: string | null;
   readonly hideIn2DMap: number;
 }
 
-/** 类型/物品/区域配置表的原始形态（仅取 UI 需要的字段）。 */
+/** 类型配置表的原始形态（清洗后仅保留 TypeId/Name，展示名直接入 label）。 */
 export interface RawPoiType {
   readonly TypeId: number;
   readonly Name: string;
-  readonly Name_Key: string;
 }
 
 export interface RawPoiItem {
@@ -51,6 +65,7 @@ export interface RawMapRegion {
   readonly Id: number;
   readonly MapId: number;
   readonly Name: string;
+  /** 中性化语言键（`region.<Id>`）；展示使用 Name 明文。 */
   readonly Name_Key: string;
   readonly WorldPos: readonly [number, number, number];
 }
@@ -60,7 +75,12 @@ export interface RawMap2dFloor {
   readonly floorName: string;
   readonly worldMinXZ: { readonly x: number; readonly z: number };
   readonly worldMaxXZ: { readonly x: number; readonly z: number };
-  readonly playableRectPx: { readonly x: number; readonly y: number; readonly width: number; readonly height: number };
+  readonly playableRectPx: {
+    readonly x: number;
+    readonly y: number;
+    readonly width: number;
+    readonly height: number;
+  };
   readonly pixelW: number;
   readonly pixelH: number;
   readonly image: string;
@@ -106,7 +126,9 @@ export interface MapPoiData {
   readonly sceneBounds: { readonly min: Vec3; readonly max: Vec3 };
   /** 默认出生点（管线世界系；缺失为 null）。 */
   readonly defaultBornPos: Vec3 | null;
-  readonly iconIndex: Readonly<Record<string, { readonly file: string; readonly width: number; readonly height: number }>>;
+  readonly iconIndex: Readonly<
+    Record<string, { readonly file: string; readonly width: number; readonly height: number }>
+  >;
   readonly minimapIndex: readonly RawMinimapInfo[];
 }
 
@@ -148,7 +170,8 @@ export function readMapPoiData(bundle: MapBundle): MapPoiData {
       mapId: definition.id,
       floor: raw.floor,
       categoryId: item !== undefined ? `t${item.TypeId}` : 'landmark',
-      displayName: raw.location,
+      // location 为空时兜底 description / 物品名，避免 UI 出现空名与检索盲区。
+      displayName: raw.location || raw.description || item?.Name || '',
       nameKey: raw.locationKey || undefined,
       position: asVec3(raw.worldPos),
       iconKey: raw.icon || item?.Icon || undefined,
@@ -198,7 +221,11 @@ export function readMapPoiData(bundle: MapBundle): MapPoiData {
 }
 
 interface RawIconIndex {
-  readonly [iconKey: string]: { readonly file: string; readonly width: number; readonly height: number };
+  readonly [iconKey: string]: {
+    readonly file: string;
+    readonly width: number;
+    readonly height: number;
+  };
 }
 type RawMinimapIndex = readonly RawMinimapInfo[];
 
@@ -223,9 +250,7 @@ export function getIconObjectUrl(loader: DmapLoader, iconFile: string): string |
   }
   try {
     const bytes = loader.read(iconFile);
-    const url = URL.createObjectURL(
-      new Blob([bytes.buffer as ArrayBuffer], { type: 'image/png' }),
-    );
+    const url = URL.createObjectURL(new Blob([bytes.buffer as ArrayBuffer], { type: 'image/png' }));
     cache.set(iconFile, url);
     return url;
   } catch {
@@ -257,9 +282,7 @@ export function floorImageInfo(entry: RawMap2dFloor): {
 }
 
 /** 楼层标定 → 2D 投影标定（结构对齐 BigmapCalibration 字段）。 */
-export function floorCalibration(
-  floorConfig: RawMap2dFloor,
-): {
+export function floorCalibration(floorConfig: RawMap2dFloor): {
   worldMinX: number;
   worldMaxX: number;
   worldMinZ: number;

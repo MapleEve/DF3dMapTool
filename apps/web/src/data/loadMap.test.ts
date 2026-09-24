@@ -1,7 +1,9 @@
+import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DmapWriter } from '@df3dmaptool/dmap';
-import { getMapById } from '@/map/registry';
+import { getMapById, MAPS } from '@/map/registry';
 import { DMAP_KEY_MATERIAL } from '@/engine/dmapKey';
+import { readMapPoiData } from './mapData';
 import {
   loadMapBundle,
   MapDataCorruptError,
@@ -102,12 +104,94 @@ describe('loadMapBundle', () => {
 
   it('manifest 格式标识不受支持 → MapDataCorruptError', async () => {
     const tampered = await DmapWriter.create()
-      .addJson(MANIFEST_ENTRY, { format: 'other-format/9', map: { mapId: 106, code: 'az3' } })
+      .addJson(MANIFEST_ENTRY, { format: 'other-format/9', maps: [] })
       .write(DMAP_KEY_MATERIAL);
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => okResponse(tampered)),
     );
     await expect(loadMapBundle(106)).rejects.toBeInstanceOf(MapDataCorruptError);
+  });
+});
+
+describe('loadMapBundle · 随仓真实容器（6 图）', () => {
+  /**
+   * 随仓分发的 6 个 .dmap 全部经 fetch → open → manifest 解析 → 派生数据全链：
+   * 清洗后的键位（中性语言键、hash 图标路径、null iconFile）若有回归在此暴露。
+   */
+  const containerBytes = new Map(
+    MAPS.map((definition) => {
+      const url = new URL(`../../public/assets/${definition.code}.dmap`, import.meta.url);
+      return [definition.bundleUrl, new Uint8Array(readFileSync(url))];
+    }),
+  );
+
+  beforeEach(() => {
+    resetBundleCache();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const bytes = containerBytes.get(String(input));
+        if (bytes === undefined) {
+          return new Response('missing', { status: 404 });
+        }
+        return okResponse(bytes);
+      }),
+    );
+  });
+
+  it.for(MAPS.map((definition) => [definition.id, definition.code] as const))(
+    '容器 %s（%s）全链通过且清单与派生数据一致',
+    async ([mapId, code]) => {
+      const bundle = await loadMapBundle(mapId);
+      const definition = getMapById(mapId);
+      expect(definition).toBeDefined();
+      expect(bundle.manifest.map.code).toBe(code);
+      expect(bundle.manifest.floors).toEqual(definition?.knownFloors);
+      expect(bundle.manifest.entries.scene).toBe(`maps/${code}/scene.json`);
+
+      // 清单声明的资产路径全部真实存在（icons/minimaps 索引 + 全部配置表）。
+      for (const path of [
+        bundle.manifest.entries.scene,
+        bundle.manifest.entries.poi,
+        bundle.manifest.entries.map2d,
+        bundle.manifest.entries.icons,
+        bundle.manifest.entries.minimaps,
+        ...bundle.manifest.entries.configs,
+      ]) {
+        expect(bundle.loader.has(path), path).toBe(true);
+      }
+
+      const poiData = readMapPoiData(bundle);
+      expect(poiData.mapId).toBe(mapId);
+      expect(poiData.pois.length).toBeGreaterThan(0);
+      expect(poiData.pois.length).toBeLessThanOrEqual(bundle.manifest.counts.pois);
+      expect(poiData.map2d.floors.length).toBeGreaterThan(0);
+      expect(poiData.categories.length).toBeGreaterThan(0);
+
+      // 派生 POI 的图标路径（hash 文件名）与 2D 底图路径必须在容器内可读。
+      for (const poi of poiData.pois) {
+        if (poi.iconFile !== undefined) {
+          expect(bundle.loader.has(poi.iconFile), `${poi.id} ${poi.iconFile}`).toBe(true);
+        }
+      }
+      for (const floor of poiData.map2d.floors) {
+        expect(bundle.loader.has(floor.image), floor.floorName).toBe(true);
+      }
+    },
+  );
+
+  it('跨图缓存：6 图加载后重复请求不触发新的 fetch', async () => {
+    for (const definition of MAPS) {
+      await loadMapBundle(definition.id);
+    }
+    const fetchMock = vi.mocked(fetch);
+    const callsAfterFirstPass = fetchMock.mock.calls.length;
+    expect(callsAfterFirstPass).toBe(MAPS.length);
+
+    for (const definition of MAPS) {
+      await loadMapBundle(definition.id);
+    }
+    expect(fetchMock.mock.calls.length).toBe(callsAfterFirstPass);
   });
 });

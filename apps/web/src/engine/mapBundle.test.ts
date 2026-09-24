@@ -40,9 +40,9 @@ async function sealContainer(entries: Record<string, unknown>): Promise<Uint8Arr
   return writer.write(DMAP_KEY_MATERIAL);
 }
 
-const SYNTHETIC_MANIFEST = {
-  format: 'dmap-map-manifest/1',
-  map: { mapId: 901, code: 'testmap' },
+const SYNTHETIC_ENTRY = {
+  mapId: 901,
+  code: 'testmap',
   floors: [1, 2],
   containers: ['testmap.dmap'],
   entries: {
@@ -53,7 +53,7 @@ const SYNTHETIC_MANIFEST = {
     icons: 'icons/index.json',
     minimaps: 'minimap/index.json',
   },
-  counts: { chunks: 1, instances: 3, vertices: 3, triangles: 1, geometries: 1 },
+  counts: { chunks: 1, instances: 3, vertices: 3, triangles: 1, geometries: 1, pois: 1 },
   chunkBounds: [
     {
       id: '0_0',
@@ -70,10 +70,21 @@ const SYNTHETIC_MANIFEST = {
   ],
 };
 
+const SYNTHETIC_MANIFEST = {
+  format: 'dmap-map-manifest/2',
+  maps: [SYNTHETIC_ENTRY],
+};
+
 describe('DmapMapBundle 往返（合成包）', () => {
   it('open → 清单校验 → 读 chunk 字节与场景 JSON', async () => {
     const glb = new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]);
-    const sceneDoc = { mapCode: 'testmap', mapId: 901, floorValues: [1, 2], bounds: { min: [0, 0, 0], max: [1, 1, 1] }, floorTriggers: [] };
+    const sceneDoc = {
+      mapCode: 'testmap',
+      mapId: 901,
+      floorValues: [1, 2],
+      bounds: { min: [0, 0, 0], max: [1, 1, 1] },
+      floorTriggers: [],
+    };
     const bytes = await sealContainer({
       'manifest.json': JSON.stringify(SYNTHETIC_MANIFEST),
       'maps/testmap/scene.json': JSON.stringify(sceneDoc),
@@ -86,6 +97,7 @@ describe('DmapMapBundle 往返（合成包）', () => {
     expect(bundle.mapCode).toBe('testmap');
     expect(bundle.floors).toEqual([1, 2]);
     expect(bundle.manifest.chunkBounds).toHaveLength(1);
+    expect(bundle.index.maps).toHaveLength(1);
 
     await expect(readSceneDoc(bundle)).resolves.toEqual(sceneDoc);
     const chunkBytes = await bundle.readChunkBytes(bundle.manifest.chunkBounds[0]);
@@ -95,7 +107,7 @@ describe('DmapMapBundle 往返（合成包）', () => {
 
   it('清单格式不符抛 MapBundleFormatError', async () => {
     const bytes = await sealContainer({
-      'manifest.json': JSON.stringify({ format: 'unknown/9', map: {} }),
+      'manifest.json': JSON.stringify({ format: 'unknown/9', maps: [] }),
     });
     stubFetch(new Map([['http://test.local/bad.dmap', bytes]]));
     await expect(DmapMapBundle.open('http://test.local/bad.dmap')).rejects.toBeInstanceOf(
@@ -106,20 +118,25 @@ describe('DmapMapBundle 往返（合成包）', () => {
   it('多容器：chunk 所在容器按需懒加载', async () => {
     const manifest = {
       ...SYNTHETIC_MANIFEST,
-      containers: ['testmap.dmap', 'testmap_2.dmap'],
-      chunkBounds: [
-        { ...SYNTHETIC_MANIFEST.chunkBounds[0] },
+      maps: [
         {
-          id: '1_0',
-          file: 'chunks/b1_0.glb',
-          container: 1,
-          instances: 1,
-          vertices: 3,
-          triangles: 1,
-          geometries: 1,
-          bytes: 4,
-          boundsMin: [100, 0, 0],
-          boundsMax: [101, 1, 1],
+          ...SYNTHETIC_ENTRY,
+          containers: ['testmap.dmap', 'testmap_2.dmap'],
+          chunkBounds: [
+            { ...SYNTHETIC_ENTRY.chunkBounds[0] },
+            {
+              id: '1_0',
+              file: 'chunks/b1_0.glb',
+              container: 1,
+              instances: 1,
+              vertices: 3,
+              triangles: 1,
+              geometries: 1,
+              bytes: 4,
+              boundsMin: [100, 0, 0],
+              boundsMax: [101, 1, 1],
+            },
+          ],
         },
       ],
     };
@@ -139,7 +156,7 @@ describe('DmapMapBundle 往返（合成包）', () => {
     );
 
     const bundle = await DmapMapBundle.open('http://test.local/data/testmap.dmap');
-    const bytes = await bundle.readChunkBytes(manifest.chunkBounds[1]);
+    const bytes = await bundle.readChunkBytes(manifest.maps[0].chunkBounds![1]);
     expect([...bytes]).toEqual([9, 9, 9, 9]);
     expect(log.map((entry) => entry.url)).toEqual([
       'http://test.local/data/testmap.dmap',
@@ -147,7 +164,7 @@ describe('DmapMapBundle 往返（合成包）', () => {
     ]);
     // 容器缓存：再次读取不再触发 fetch
     const before = log.length;
-    await bundle.readChunkBytes(manifest.chunkBounds[1]);
+    await bundle.readChunkBytes(manifest.maps[0].chunkBounds![1]);
     expect(log.length).toBe(before);
     bundle.dispose();
   });
@@ -183,14 +200,19 @@ function buildInstancedGlb(): Uint8Array {
     { data: new Uint8Array(scales.buffer), target: 34962 },
   ];
   const bin = new Uint8Array(
-    binChunks.reduce((sum, chunk) => sum + (chunk.data.length + 3 & ~3), 0),
+    binChunks.reduce((sum, chunk) => sum + ((chunk.data.length + 3) & ~3), 0),
   );
   const views: Record<string, number>[] = [];
   let offset = 0;
   for (const chunk of binChunks) {
     bin.set(chunk.data, offset);
-    views.push({ buffer: 0, byteOffset: offset, byteLength: chunk.data.length, target: chunk.target });
-    offset += chunk.data.length + 3 & ~3;
+    views.push({
+      buffer: 0,
+      byteOffset: offset,
+      byteLength: chunk.data.length,
+      target: chunk.target,
+    });
+    offset += (chunk.data.length + 3) & ~3;
   }
 
   const gltf = {
@@ -201,18 +223,30 @@ function buildInstancedGlb(): Uint8Array {
       {
         name: 'inst-0',
         mesh: 0,
-        extensions: { EXT_mesh_gpu_instancing: { attributes: { TRANSLATION: 3, ROTATION: 4, SCALE: 5 } } },
+        extensions: {
+          EXT_mesh_gpu_instancing: { attributes: { TRANSLATION: 3, ROTATION: 4, SCALE: 5 } },
+        },
         extras: { resPath: 'Scene/AZ3/test.prefab', tag: 16 },
       },
     ],
     meshes: [
-      { name: 'm0', primitives: [{ attributes: { POSITION: 0, NORMAL: 1 }, indices: 2, material: 0, mode: 4 }] },
+      {
+        name: 'm0',
+        primitives: [{ attributes: { POSITION: 0, NORMAL: 1 }, indices: 2, material: 0, mode: 4 }],
+      },
     ],
     materials: [{ name: 'default', pbrMetallicRoughness: { baseColorFactor: [0.7, 0.7, 0.7, 1] } }],
     buffers: [{ byteLength: bin.length }],
     bufferViews: views,
     accessors: [
-      { bufferView: 0, componentType: 5126, count: 3, type: 'VEC3', min: [0, 0, 0], max: [1, 1, 0] },
+      {
+        bufferView: 0,
+        componentType: 5126,
+        count: 3,
+        type: 'VEC3',
+        min: [0, 0, 0],
+        max: [1, 1, 0],
+      },
       { bufferView: 1, componentType: 5126, count: 3, type: 'VEC3' },
       { bufferView: 2, componentType: 5125, count: 3, type: 'SCALAR' },
       { bufferView: 3, componentType: 5126, count: 3, type: 'VEC3' },
@@ -277,7 +311,9 @@ describe('GLB → three（实例化扩展 + 楼层拆分）', () => {
       const mesh = scene.children[0] as InstancedMesh;
 
       // 单一分带：原样返回，不克隆
-      const single = splitInstancedMeshByFloor(mesh, [{ floor: 1, yMin: Number.NEGATIVE_INFINITY, yMax: Number.POSITIVE_INFINITY }]);
+      const single = splitInstancedMeshByFloor(mesh, [
+        { floor: 1, yMin: Number.NEGATIVE_INFINITY, yMax: Number.POSITIVE_INFINITY },
+      ]);
       expect(single).toHaveLength(1);
       expect(single[0].floor).toBe(1);
       expect(single[0].mesh).toBe(mesh);
@@ -308,30 +344,47 @@ describe('GLB → three（实例化扩展 + 楼层拆分）', () => {
 describe('真实数据包（az3.dmap，本仓内置资产）', () => {
   const skipped = !existsSync(REAL_BUNDLE_URL);
 
-  it.runIf(!skipped)('清单/场景元数据/chunk 字节端到端校验', async () => {
-    const bytes = new Uint8Array(readFileSync(REAL_BUNDLE_URL));
-    stubFetch(new Map([['http://test.local/data/az3.dmap', bytes]]));
+  it.runIf(!skipped)(
+    '清单/场景元数据/chunk 字节端到端校验',
+    async () => {
+      const bytes = new Uint8Array(readFileSync(REAL_BUNDLE_URL));
+      stubFetch(new Map([['http://test.local/data/az3.dmap', bytes]]));
 
-    const bundle = await DmapMapBundle.open('http://test.local/data/az3.dmap');
-    expect(bundle.mapId).toBe(106);
-    expect(bundle.mapCode).toBe('az3');
-    expect(bundle.floors).toEqual([1, 2, 3]);
-    expect(bundle.manifest.containers).toEqual(['az3.dmap']);
+      const bundle = await DmapMapBundle.open('http://test.local/data/az3.dmap');
+      expect(bundle.mapId).toBe(106);
+      expect(bundle.mapCode).toBe('az3');
+      expect(bundle.floors).toEqual([1, 2, 3]);
+      expect(bundle.manifest.containers).toEqual(['az3.dmap']);
+      // 清单为 6 图索引，其中本容器承载 az3
+      expect(bundle.index.maps).toHaveLength(6);
+      expect(bundle.index.maps.map((entry) => entry.code)).toEqual([
+        'damiris',
+        'forrest',
+        'brakkesh',
+        'tideprison',
+        'az3',
+        'spacecenter',
+      ]);
+      const summary = bundle.index.maps.find((entry) => entry.mapId === 101);
+      expect(summary?.counts.pois).toBeGreaterThan(0);
+      expect(summary?.chunkBounds).toBeUndefined();
 
-    const chunks = bundle.manifest.chunkBounds;
-    expect(chunks.length).toBeGreaterThan(50);
-    expect(bundle.manifest.counts.instances).toBeGreaterThan(45000);
+      const chunks = bundle.manifest.chunkBounds;
+      expect(chunks.length).toBeGreaterThan(50);
+      expect(bundle.manifest.counts.instances).toBeGreaterThan(45000);
 
-    const sceneDoc = await readSceneDoc(bundle);
-    expect(sceneDoc.floorValues).toEqual([1, 2, 3]);
-    expect(sceneDoc.floorTriggers.length).toBeGreaterThan(3);
-    expect(sceneDoc.bounds.min[0]).toBeLessThan(sceneDoc.bounds.max[0]);
+      const sceneDoc = await readSceneDoc(bundle);
+      expect(sceneDoc.floorValues).toEqual([1, 2, 3]);
+      expect(sceneDoc.floorTriggers.length).toBeGreaterThan(3);
+      expect(sceneDoc.bounds.min[0]).toBeLessThan(sceneDoc.bounds.max[0]);
 
-    // chunk GLB 字节：长度与清单一致、GLB magic 正确
-    const first = chunks[0];
-    const glb = await bundle.readChunkBytes(first);
-    expect(glb.byteLength).toBe(first.bytesCompressed ?? first.bytes);
-    expect(String.fromCharCode(glb[0], glb[1], glb[2], glb[3])).toBe('glTF');
-    bundle.dispose();
-  }, 30000);
+      // chunk GLB 字节：长度与清单一致、GLB magic 正确
+      const first = chunks[0];
+      const glb = await bundle.readChunkBytes(first);
+      expect(glb.byteLength).toBe(first.bytesCompressed ?? first.bytes);
+      expect(String.fromCharCode(glb[0], glb[1], glb[2], glb[3])).toBe('glTF');
+      bundle.dispose();
+    },
+    30000,
+  );
 });

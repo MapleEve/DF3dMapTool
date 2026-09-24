@@ -26,13 +26,21 @@ export interface SceneManagerOptions {
   readonly near?: number;
   readonly far?: number;
   readonly maxDevicePixelRatio?: number;
+  /** 抗锯齿（渲染器创建参数，创建后不可变更，需重建视口）。 */
+  readonly antialias?: boolean;
+  /** 帧率上限（fps）；null 跟随显示器刷新率。 */
+  readonly frameLimit?: number | null;
 }
 
-const DEFAULT_OPTIONS: Required<SceneManagerOptions> = {
+const DEFAULT_OPTIONS: Required<Omit<SceneManagerOptions, 'frameLimit'>> & {
+  frameLimit: number | null;
+} = {
   fov: 70,
   near: 0.5,
   far: 6000,
   maxDevicePixelRatio: 2,
+  antialias: true,
+  frameLimit: null,
 };
 
 /** 背景与雾同色：远处 chunk 渐隐入背景，掩盖流式加载的边缘。 */
@@ -48,7 +56,9 @@ export class SceneManager {
   readonly renderer: WebGLRenderer;
 
   readonly #canvas: HTMLCanvasElement;
-  readonly #options: Required<SceneManagerOptions>;
+  readonly #options: Required<Omit<SceneManagerOptions, 'frameLimit'>> & {
+    frameLimit: number | null;
+  };
   readonly #layers: EngineLayer[] = [];
   readonly #clock = new Clock();
   readonly #baseLighting: Light;
@@ -56,6 +66,8 @@ export class SceneManager {
   #frameHandle = 0;
   #resizeObserver: ResizeObserver | null = null;
   #running = false;
+  /** 帧率上限生效时累计到下一帧的时间（秒）。 */
+  #frameBudget = 0;
 
   constructor(canvas: HTMLCanvasElement, options: SceneManagerOptions = {}) {
     this.#canvas = canvas;
@@ -63,7 +75,7 @@ export class SceneManager {
 
     this.renderer = new WebGLRenderer({
       canvas,
-      antialias: true,
+      antialias: this.#options.antialias,
       powerPreference: 'high-performance',
     });
     this.renderer.setPixelRatio(
@@ -138,6 +150,12 @@ export class SceneManager {
     cancelAnimationFrame(this.#frameHandle);
   }
 
+  /** 运行时调整帧率上限；null 恢复跟随显示器刷新率。 */
+  setFrameLimit(fps: number | null): void {
+    this.#options.frameLimit = fps;
+    this.#frameBudget = 0;
+  }
+
   handleResize(): void {
     const host = this.#canvas.parentElement;
     const width = host?.clientWidth ?? this.#canvas.clientWidth;
@@ -167,8 +185,20 @@ export class SceneManager {
     }
     this.#frameHandle = requestAnimationFrame(this.#tick);
     const deltaSeconds = this.#clock.getDelta();
+    // 帧率上限：预算不足时跳过渲染，图层步长仍按真实流逝时间推进
+    const limit = this.#options.frameLimit;
+    let step = deltaSeconds;
+    if (limit !== null && limit > 0) {
+      this.#frameBudget += deltaSeconds;
+      const minFrame = 1 / limit;
+      if (this.#frameBudget < minFrame * 0.98) {
+        return;
+      }
+      step = Math.min(this.#frameBudget, 0.25);
+      this.#frameBudget = 0;
+    }
     for (const layer of this.#layers) {
-      layer.update?.(deltaSeconds);
+      layer.update?.(step);
     }
     this.renderer.render(this.scene, this.camera);
   };

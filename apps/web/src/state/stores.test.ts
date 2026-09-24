@@ -146,6 +146,23 @@ describe('uiStore', () => {
     expect(useUiStore.getState().settingsOpen).toBe(true);
   });
 
+  it('2D/3D 切换相机状态保持：大地图开合不触碰相机 HUD 与楼层', () => {
+    // 大地图是 3D 常驻场景之上的覆盖层：开合不重置 3D 相机/楼层（位置记忆）。
+    useUiStore.getState().setCameraHud({ position: { x: -1657.2, y: 40, z: -1859.3 }, yaw: 0.7 });
+    useFloorStore.getState().applyFloors([1, 2, 3], 2);
+
+    useUiStore.getState().toggleBigmap();
+    expect(useUiStore.getState().bigmapOpen).toBe(true);
+    expect(useUiStore.getState().cameraHud?.position).toEqual({ x: -1657.2, y: 40, z: -1859.3 });
+    expect(useFloorStore.getState().floor).toBe(2);
+
+    useUiStore.getState().toggleBigmap();
+    expect(useUiStore.getState().bigmapOpen).toBe(false);
+    expect(useUiStore.getState().cameraHud?.position).toEqual({ x: -1657.2, y: 40, z: -1859.3 });
+    expect(useUiStore.getState().cameraHud?.yaw).toBeCloseTo(0.7, 9);
+    expect(useFloorStore.getState().floor).toBe(2);
+  });
+
   it('setLanguage 同步语言值并触发 i18next 切换', async () => {
     useUiStore.getState().setLanguage('en');
     expect(useUiStore.getState().language).toBe('en');

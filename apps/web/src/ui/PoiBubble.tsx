@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import type { PoiCategory, PoiDefinition } from '@/poi/types';
+import { useNavStore } from '@/state/navStore';
 
 export interface PoiBubbleProps {
   poi: PoiDefinition;
@@ -9,9 +10,10 @@ export interface PoiBubbleProps {
   onLocate: () => void;
 }
 
-/** POI 详情气泡：图标/名称/楼层/分类/描述 + 定位。 */
+/** POI 详情气泡：图标/名称/楼层/分类/描述 + 定位 + 寻路。 */
 export function PoiBubble({ poi, category, iconUrl, onClose, onLocate }: PoiBubbleProps) {
   const { t } = useTranslation();
+  const requestPath = useNavStore((state) => state.requestPath);
   // 数据包派生分类的 labelKey 不在静态 i18n 键表内，运行时按字符串查表并回退 label。
   const categoryLabel =
     category?.labelKey !== undefined
@@ -50,6 +52,14 @@ export function PoiBubble({ poi, category, iconUrl, onClose, onLocate }: PoiBubb
       <footer className="poi-bubble-actions">
         <button type="button" onClick={onLocate}>
           {t('poi.locate')}
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            requestPath(poi.position, poi.displayName);
+          }}
+        >
+          {t('poi.navigate')}
         </button>
       </footer>
     </div>

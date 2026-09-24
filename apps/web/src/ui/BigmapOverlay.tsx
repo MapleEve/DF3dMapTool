@@ -7,6 +7,12 @@ import {
   resolveFloorEntry,
   type RawMap2dFloor,
 } from '@/data';
+import {
+  MAX_ZOOM_INDEX,
+  MIN_ZOOM_INDEX,
+  planTeleport,
+  resolveTeleportFloor,
+} from '@/bigmap';
 import { BigmapCanvas, type BigmapController, type BigmapPoiMarker } from '@/bigmap/BigmapCanvas';
 import type { WorldXZ } from '@/bigmap/types';
 import { filterPois } from '@/poi/filter';
@@ -20,6 +26,8 @@ import { useUiStore } from '@/state/uiStore';
 /**
  * 2D 俯视大地图覆盖层（M 键全屏）。
  * 底图为数据包内按楼层烘焙的俯视整图；与 3D 共用同一份 POI 数据与投影标定。
+ * 3D 场景常驻：本覆盖层只在其上显示，开合不触碰 3D 相机状态（2D/3D 切换位置记忆）；
+ * 传送（标记/POI）为显式按钮动作：像素→世界逆变换 → 3D 相机飞行 + 跨层楼层同步。
  */
 export function BigmapOverlay() {
   const { t } = useTranslation();
@@ -29,14 +37,18 @@ export function BigmapOverlay() {
   const bundle = useMapDataStore((state) => state.bundle);
   const poiData = useMapDataStore((state) => state.poiData);
   const floors = useFloorStore((state) => state.floors);
+  const floor = useFloorStore((state) => state.floor);
   const setFloor = useFloorStore((state) => state.setFloor);
   const hiddenCategories = usePoiFilterStore((state) => state.hiddenCategories);
   const selectedPoiId = usePoiStore((state) => state.selectedPoiId);
   const selectPoi = usePoiStore((state) => state.selectPoi);
+  const requestFlyTo = usePoiStore((state) => state.requestFlyTo);
 
   // 大地图楼层独立于 3D 楼层：null 表示“全图”概览，进入时跟随当前楼层。
   const [bigmapFloor, setBigmapFloor] = useState<number | null>(null);
   const [marker, setMarker] = useState<WorldXZ | null>(null);
+  const [selectedRegionId, setSelectedRegionId] = useState<string | null>(null);
+  const [zoomStep, setZoomStep] = useState<number>(MIN_ZOOM_INDEX);
   const [iconVersion, setIconVersion] = useState(0);
   const iconImagesRef = useRef(new Map<string, HTMLImageElement>());
   const controllerRef = useRef<BigmapController | null>(null);
@@ -45,6 +57,8 @@ export function BigmapOverlay() {
   useEffect(() => {
     setBigmapFloor(null);
     setMarker(null);
+    setSelectedRegionId(null);
+    setZoomStep(MIN_ZOOM_INDEX);
   }, [poiData]);
 
   // 楼层条目 + 标定 + 底图 object URL。
@@ -141,10 +155,65 @@ export function BigmapOverlay() {
     }));
   }, [poiData]);
 
+  const selectedRegion = useMemo(() => {
+    if (poiData === null || selectedRegionId === null) {
+      return null;
+    }
+    return poiData.regions.find((region) => region.id === selectedRegionId) ?? null;
+  }, [poiData, selectedRegionId]);
+
+  const selectedPoi = useMemo(() => {
+    if (poiData === null || selectedPoiId === null) {
+      return null;
+    }
+    return poiData.pois.find((poi) => poi.id === selectedPoiId) ?? null;
+  }, [poiData, selectedPoiId]);
+
   const playerXZ = useMemo(
     () => (cameraHud === null ? null : { x: cameraHud.position.x, z: cameraHud.position.z }),
     [cameraHud],
   );
+
+  // 传送执行：楼层同步 → 3D 相机飞行 → 返回 3D（大地图关闭，相机记忆新落点）。
+  const teleportToWorld = (world: WorldXZ, worldY: number | undefined, targetFloor: number | null) => {
+    const plan = planTeleport({ world, worldY, targetFloor, currentFloor: floor, floors });
+    if (plan.floorChanged) {
+      setFloor(plan.floor);
+    }
+    requestFlyTo(plan.position);
+    setBigmapOpen(false);
+  };
+
+  const handleTeleportMarker = () => {
+    if (marker === null) {
+      return;
+    }
+    teleportToWorld(marker, undefined, bigmapFloor);
+    setMarker(null);
+  };
+
+  const handleTeleportPoi = () => {
+    if (selectedPoi === null) {
+      return;
+    }
+    teleportToWorld(
+      { x: selectedPoi.position.x, z: selectedPoi.position.z },
+      selectedPoi.position.y,
+      resolveTeleportFloor(selectedPoi.floor, bigmapFloor),
+    );
+  };
+
+  const handleSelectRegion = (regionId: string | null) => {
+    setSelectedRegionId(regionId);
+    if (regionId === null || poiData === null) {
+      return;
+    }
+    const region = poiData.regions.find((entry) => entry.id === regionId);
+    if (region !== undefined) {
+      // 区域定位：高亮当前层标注 + 3D 相机飞向区域锚点（大地图保持打开）。
+      requestFlyTo(region.position);
+    }
+  };
 
   const floorOptions = useMemo<
     readonly { readonly value: number | null; readonly key: string; readonly label: string }[]
@@ -202,8 +271,35 @@ export function BigmapOverlay() {
           <button type="button" onClick={() => controllerRef.current?.zoomOut()} aria-label={t('bigmap.zoomOut')}>
             −
           </button>
+          <input
+            type="range"
+            className="bigmap-zoom-slider"
+            min={MIN_ZOOM_INDEX}
+            max={MAX_ZOOM_INDEX}
+            step={1}
+            value={zoomStep}
+            aria-label={t('bigmap.zoomSlider')}
+            onChange={(event) => {
+              const next = Number(event.target.value);
+              setZoomStep(next);
+              controllerRef.current?.setZoomStep(next);
+            }}
+          />
           <button type="button" onClick={() => controllerRef.current?.resetView()}>
             {t('bigmap.resetView')}
+          </button>
+        </div>
+        <div className="bigmap-teleport-actions">
+          <button
+            type="button"
+            disabled={selectedPoi === null}
+            onClick={handleTeleportPoi}
+            title={selectedPoi?.displayName}
+          >
+            {t('bigmap.teleportToPoi')}
+          </button>
+          <button type="button" disabled={marker === null} onClick={handleTeleportMarker}>
+            {t('bigmap.teleportToMarker')}
           </button>
         </div>
         <span className="bigmap-hint">{t('bigmap.hint')}</span>
@@ -219,11 +315,14 @@ export function BigmapOverlay() {
             calibration={calibration}
             pois={markers}
             regions={regions}
+            selectedRegionId={selectedRegionId}
             playerXZ={playerXZ}
             playerYaw={cameraHud?.yaw ?? null}
             marker={marker}
             onSelectPoi={selectPoi}
             onPlaceMarker={setMarker}
+            onSelectRegion={handleSelectRegion}
+            onZoomChange={setZoomStep}
             controllerRef={controllerRef}
           />
         ) : (
@@ -232,6 +331,11 @@ export function BigmapOverlay() {
           </p>
         )}
       </div>
+      {selectedRegion !== null ? (
+        <footer className="bigmap-region-bar" role="status">
+          {t('bigmap.selectedRegion', { name: selectedRegion.name })}
+        </footer>
+      ) : null}
     </div>
   );
 }

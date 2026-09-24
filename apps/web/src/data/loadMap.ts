@@ -2,7 +2,12 @@ import { DmapError, DmapLoader } from '@df3dmaptool/dmap';
 import { DMAP_KEY_MATERIAL } from '@/engine/dmapKey';
 import { getMapById } from '@/map/registry';
 import type { MapId } from '@/map/types';
-import { MANIFEST_ENTRY, MANIFEST_FORMAT, type MapBundle, type MapManifest } from './manifest';
+import {
+  MANIFEST_ENTRY,
+  resolveMapManifest,
+  type MapBundle,
+  type MapManifestIndex,
+} from './manifest';
 
 /** 面向 UI 的加载失败归类。 */
 export type MapLoadErrorCode = 'unavailable' | 'corrupt' | 'unknown';
@@ -40,20 +45,6 @@ export function mapLoadErrorCode(error: unknown): MapLoadErrorCode {
 
 /** 下载进度回调：fraction ∈ [0, 1]，下载阶段最高报到 0.95，容器校验完成报 1。 */
 export type LoadProgressCallback = (fraction: number) => void;
-
-function validateManifest(manifest: MapManifest, mapId: MapId): void {
-  if (manifest.format !== MANIFEST_FORMAT) {
-    throw new RangeError(`manifest 格式不支持: ${manifest.format}`);
-  }
-  if (manifest.map.mapId !== mapId) {
-    throw new RangeError(
-      `manifest.map.mapId (${manifest.map.mapId}) 与请求地图 (${mapId}) 不一致`,
-    );
-  }
-  if (!Array.isArray(manifest.floors) || manifest.floors.length === 0) {
-    throw new RangeError('manifest.floors 不能为空');
-  }
-}
 
 /** 同一地图的加载结果按 mapId 复用（并发与重复调用共享同一次网络请求）。 */
 const bundleCache = new Map<MapId, Promise<MapBundle>>();
@@ -111,8 +102,8 @@ async function doLoadMapBundle(
   }
 
   try {
-    const manifest = loader.readJson<MapManifest>(MANIFEST_ENTRY);
-    validateManifest(manifest, mapId);
+    const index = loader.readJson<MapManifestIndex>(MANIFEST_ENTRY);
+    const manifest = resolveMapManifest(index, mapId);
     onProgress?.(1);
     return { definition, manifest, loader };
   } catch (error) {

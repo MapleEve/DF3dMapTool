@@ -4,11 +4,12 @@ import { AssetFetchError } from './assets';
 
 /**
  * 数据包清单（manifest.json）的运行时结构。
- * 与资产管线的打包格式一一对应：清单在首个容器内，chunk 资产
- * 按 manifest.chunkBounds[i].container 分散到 containers 列表的容器中。
+ * 与资产管线的打包格式一一对应：清单是全部内置地图的索引（maps 数组），
+ * 其中本容器承载的地图条目携带 entries 与 chunkBounds；chunk 资产
+ * 按 chunkBounds[i].container 分散到 containers 列表的容器中。
  */
 export const MAP_MANIFEST_ENTRY = 'manifest.json';
-export const MAP_MANIFEST_FORMAT = 'dmap-map-manifest/1';
+export const MAP_MANIFEST_FORMAT = 'dmap-map-manifest/2';
 
 export interface DmapChunkInfo {
   readonly id: string;
@@ -34,19 +35,40 @@ export interface DmapMapManifestEntries {
   readonly minimaps: string;
 }
 
+export interface DmapMapCounts {
+  readonly chunks: number;
+  readonly instances: number;
+  readonly vertices: number;
+  readonly triangles: number;
+  readonly geometries: number;
+  readonly pois: number;
+}
+
+/** 清单索引中一张地图的条目（本容器的承载图才带 entries/chunkBounds）。 */
+export interface DmapMapIndexEntry {
+  readonly mapId: number;
+  readonly code: string;
+  readonly floors: readonly number[];
+  readonly containers: readonly string[];
+  readonly counts: DmapMapCounts;
+  readonly entries?: DmapMapManifestEntries;
+  readonly chunkBounds?: readonly DmapChunkInfo[];
+}
+
+/** 容器内 manifest.json 的原始形态（全部地图的索引）。 */
+export interface DmapMapManifestIndex {
+  readonly format: string;
+  readonly maps: readonly DmapMapIndexEntry[];
+}
+
+/** 解析后的单图清单视图（本容器承载的地图，结构与 /1 时代同构）。 */
 export interface DmapMapManifest {
   readonly format: string;
   readonly map: { readonly mapId: number; readonly code: string };
   readonly floors: readonly number[];
   readonly containers: readonly string[];
   readonly entries: DmapMapManifestEntries;
-  readonly counts: {
-    readonly chunks: number;
-    readonly instances: number;
-    readonly vertices: number;
-    readonly triangles: number;
-    readonly geometries: number;
-  };
+  readonly counts: DmapMapCounts;
   readonly chunkBounds: readonly DmapChunkInfo[];
 }
 
@@ -85,38 +107,56 @@ export class MapBundleFormatError extends Error {
  * 从对应容器读取；容器文件首次访问时才拉取并解密，之后常驻内存。
  */
 export class DmapMapBundle {
+  /** 本容器承载地图的单图清单视图（从索引解析）。 */
   readonly manifest: DmapMapManifest;
+  /** 容器内嵌的完整 6 图索引。 */
+  readonly index: DmapMapManifestIndex;
   readonly #baseUrl: string;
   readonly #containers = new Map<number, DmapLoader>();
 
-  private constructor(baseUrl: string, manifest: DmapMapManifest, primary: DmapLoader) {
+  private constructor(
+    baseUrl: string,
+    manifest: DmapMapManifest,
+    index: DmapMapManifestIndex,
+    primary: DmapLoader,
+  ) {
     this.#baseUrl = baseUrl;
     this.manifest = manifest;
+    this.index = index;
     this.#containers.set(0, primary);
   }
 
   /** 拉取首个容器并校验清单；网络失败抛 AssetFetchError，容器校验失败抛 DmapError。 */
-  static async open(url: string): Promise<DmapMapBundle> {
+  static async open(url: string, expectedMapId?: number): Promise<DmapMapBundle> {
     const primary = await openContainer(url);
-    return DmapMapBundle.fromLoader(primary, url);
+    return DmapMapBundle.fromLoader(primary, url, expectedMapId);
   }
 
   /**
    * 基于已打开的容器构建（baseUrl 用于清单声明多容器时按需加载相邻分片）。
    * 数据层已下载/解密同一容器时复用，避免重复拉取。
+   * expectedMapId 提供时按其解析；否则解析容器唯一承载的地图条目。
    */
-  static fromLoader(loader: DmapLoader, baseUrl: string): DmapMapBundle {
+  static fromLoader(loader: DmapLoader, baseUrl: string, expectedMapId?: number): DmapMapBundle {
+    let index: DmapMapManifestIndex;
     let manifest: DmapMapManifest;
     try {
-      manifest = loader.readJson<DmapMapManifest>(MAP_MANIFEST_ENTRY);
+      index = loader.readJson<DmapMapManifestIndex>(MAP_MANIFEST_ENTRY);
+      manifest = resolveOwnManifest(index, expectedMapId);
     } catch (error) {
       if (error instanceof DmapError) {
         throw error;
       }
-      throw new MapBundleFormatError(baseUrl, '缺少或无法解析 manifest.json');
+      if (error instanceof MapBundleFormatError) {
+        throw error;
+      }
+      throw new MapBundleFormatError(
+        baseUrl,
+        error instanceof Error ? error.message : '缺少或无法解析 manifest.json',
+      );
     }
     validateManifest(manifest, baseUrl);
-    return new DmapMapBundle(baseUrl, manifest, loader);
+    return new DmapMapBundle(baseUrl, manifest, index, loader);
   }
 
   get mapId(): number {
@@ -169,9 +209,7 @@ export class DmapMapBundle {
 
   /** 预取全部容器（可选：首屏后预热，减少首块加载等待）。 */
   async preloadAllContainers(): Promise<void> {
-    await Promise.all(
-      this.manifest.containers.map((_, index) => this.container(index)),
-    );
+    await Promise.all(this.manifest.containers.map((_, index) => this.container(index)));
   }
 
   dispose(): void {
@@ -197,6 +235,53 @@ async function openContainer(url: string): Promise<DmapLoader> {
   return DmapLoader.open(bytes, DMAP_KEY_MATERIAL);
 }
 
+/**
+ * 从索引解析本容器承载的地图条目：
+ * expectedMapId 提供时按其匹配，否则要求承载图条目（携带非空 chunkBounds）唯一。
+ */
+function resolveOwnManifest(index: DmapMapManifestIndex, expectedMapId?: number): DmapMapManifest {
+  if (index.format !== MAP_MANIFEST_FORMAT) {
+    throw new RangeError(`format 应为 ${MAP_MANIFEST_FORMAT}`);
+  }
+  if (!Array.isArray(index.maps) || index.maps.length === 0) {
+    throw new RangeError('manifest.maps 不能为空');
+  }
+  let entry: DmapMapIndexEntry | undefined;
+  if (expectedMapId !== undefined) {
+    entry = index.maps.find((item) => item.mapId === expectedMapId);
+  } else {
+    const carriers = index.maps.filter(
+      (item) => Array.isArray(item.chunkBounds) && item.chunkBounds.length > 0,
+    );
+    if (carriers.length === 1) {
+      entry = carriers[0];
+    }
+  }
+  if (entry === undefined) {
+    throw new RangeError(
+      expectedMapId !== undefined
+        ? `manifest.maps 中不存在地图 ${expectedMapId}`
+        : '承载图条目应唯一',
+    );
+  }
+  if (
+    entry.entries === undefined ||
+    !Array.isArray(entry.chunkBounds) ||
+    entry.chunkBounds.length === 0
+  ) {
+    throw new RangeError(`本容器不承载地图 ${entry.mapId} 的数据`);
+  }
+  return {
+    format: index.format,
+    map: { mapId: entry.mapId, code: entry.code },
+    floors: entry.floors,
+    containers: entry.containers,
+    entries: entry.entries,
+    counts: entry.counts,
+    chunkBounds: entry.chunkBounds,
+  };
+}
+
 function validateManifest(manifest: DmapMapManifest, url: string): void {
   const expect = (condition: boolean, message: string): void => {
     if (!condition) {
@@ -207,7 +292,10 @@ function validateManifest(manifest: DmapMapManifest, url: string): void {
   expect(typeof manifest.map?.mapId === 'number', 'map.mapId 缺失');
   expect(typeof manifest.map?.code === 'string' && manifest.map.code.length > 0, 'map.code 缺失');
   expect(Array.isArray(manifest.floors) && manifest.floors.length > 0, 'floors 不能为空');
-  expect(Array.isArray(manifest.containers) && manifest.containers.length > 0, 'containers 不能为空');
+  expect(
+    Array.isArray(manifest.containers) && manifest.containers.length > 0,
+    'containers 不能为空',
+  );
   expect(typeof manifest.entries?.scene === 'string', 'entries.scene 缺失');
   expect(
     Array.isArray(manifest.chunkBounds) && manifest.chunkBounds.length > 0,

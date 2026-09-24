@@ -33,8 +33,18 @@ export const en: TranslationSchema = {
   poi: {
     allFloors: 'All floors',
     locate: 'Locate',
+    navigate: 'Route',
     close: 'Close',
     noDescription: 'No description yet',
+  },
+  nav: {
+    title: 'Route',
+    loading: 'Loading navigation data…',
+    unavailable: 'No navigation data for this map',
+    unreachable: 'No walkable route to "{{target}}"',
+    toTarget: 'Destination: {{target}}',
+    distance: 'About {{distance}} m',
+    close: 'Close',
   },
   toolbar: {
     mapSelect: 'Select map',
@@ -69,7 +79,14 @@ export const en: TranslationSchema = {
     floorTitle: 'Floor switch',
     zoomIn: 'Zoom in',
     zoomOut: 'Zoom out',
+    zoomSlider: 'Zoom level',
     resetView: 'Reset',
+    teleportToPoi: 'Teleport here',
+    teleportToMarker: 'Teleport to marker',
+    selectedRegion: 'Region selected: {{name}} (3D camera located)',
+  },
+  minimap: {
+    title: 'Minimap',
   },
   hud: {
     worldCoords: 'World coords',
@@ -78,9 +95,38 @@ export const en: TranslationSchema = {
   },
   settings: {
     title: 'Settings',
+    tabs: {
+      graphics: 'Graphics',
+      general: 'General',
+    },
     quality: 'Quality',
     qualityHint: 'Quality caps the render resolution (pixel ratio); changes apply immediately.',
+    antialias: 'Antialiasing',
+    antialiasHint:
+      'Edge smoothing quality. Requires rebuilding the renderer: reopen the page to apply.',
+    frameLimit: 'Frame rate limit',
+    frameLimitLevels: {
+      unlimited: 'Unlimited',
+      '60': '60 FPS',
+      '30': '30 FPS',
+    },
+    fullscreen: 'Fullscreen',
+    fullscreenHint: 'Browsers require fullscreen to start from a page interaction; F11 also works.',
+    fov: 'Field of view (FOV)',
     language: 'Language',
+    sensitivity: 'Camera sensitivity',
+    respawn: 'Return to spawn',
+    respawnAction: 'Back to entry view',
+    airJump: 'Air jump',
+    airJumpHint:
+      'Mirrors the original settings list: this simulator has no character controller, the preference is stored only.',
+    volume: 'Volume',
+    volumeHint: 'The simulator has no audio output yet; the preference is stored only.',
+    ambientMotes: 'Ambient motes',
+    ambientMotesHint:
+      'Mirrors the original visual toggle: no particle system is built in this scene yet, the preference is stored only.',
+    on: 'On',
+    off: 'Off',
     qualityLevels: {
       low: 'Low',
       medium: 'Medium',

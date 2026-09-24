@@ -3,12 +3,7 @@ import { DmapLoader } from '@df3dmaptool/dmap';
 import { getMapById } from '@/map/registry';
 import { DMAP_KEY_MATERIAL } from '@/engine/dmapKey';
 import { floorCalibration, floorImageInfo, readMapPoiData, resolveFloorEntry } from './mapData';
-import {
-  buildFixtureBundleBytes,
-  fixtureManifest,
-  FIXTURE_MAP2D,
-  FIXTURE_POI,
-} from './testBundle';
+import { buildFixtureBundleBytes, fixtureManifest, FIXTURE_MAP2D, FIXTURE_POI } from './testBundle';
 
 async function openFixturePoiData() {
   const bytes = await buildFixtureBundleBytes(106);
@@ -25,11 +20,12 @@ describe('readMapPoiData', () => {
     const poiData = await openFixturePoiData();
 
     // active=0 的条目被剔除。
-    expect(poiData.pois).toHaveLength(2);
+    expect(poiData.pois).toHaveLength(3);
 
     const spawn = poiData.pois.find((poi) => poi.id === '1060206001');
     expect(spawn).toBeDefined();
     expect(spawn?.displayName).toBe('海边办公楼出生点');
+    expect(spawn?.nameKey).toBe('poi.1060206001.location');
     expect(spawn?.categoryId).toBe('t6');
     expect(spawn?.floor).toBe(0);
     expect(spawn?.position).toEqual({ x: -1657.2, y: 0.2, z: -1859.3 });
@@ -41,6 +37,15 @@ describe('readMapPoiData', () => {
     const hidden = poiData.pois.find((poi) => poi.id === '1060206003');
     expect(hidden?.hiddenInBigmap).toBe(true);
     expect(hidden?.categoryId).toBe('t1');
+
+    // 无独立图标资产（iconFile=null）→ iconFile 归一为 undefined；
+    // icon 键回退物品图标（物品配置 Icon 非空时保留，供占位/检索消费）。
+    // location/subTitle 全空 → displayName 兜底物品名（检索可命中，不出空名）。
+    const noIcon = poiData.pois.find((poi) => poi.id === '1060206004');
+    expect(noIcon).toBeDefined();
+    expect(noIcon?.iconFile).toBeUndefined();
+    expect(noIcon?.iconKey).toBe('bxx');
+    expect(noIcon?.displayName).toBe('保险柜');
 
     // 分类来自类型配置。
     expect(poiData.categories.map((category) => category.id)).toEqual(['t1', 't6']);
@@ -93,6 +98,56 @@ describe('readMapPoiData', () => {
     expect(resolveFloorEntry(dbLike, 2)?.image).toBe('minimap/db.png');
 
     expect(FIXTURE_POI.length).toBeGreaterThan(0);
+  });
+
+  it('各图楼层集按实际数据解析：有专属贴图用专属，缺贴图回落整图', () => {
+    // 零号大坝形态：楼层表 [-1, 1, 2]，2D 贴图仅有整图 db 与 db_2f
+    // （无 db_-1f/db_1f 条目，地下 1 层与 1 层回落整图概览，2 层用专属贴图）。
+    const damirisLike = {
+      ...FIXTURE_MAP2D,
+      floors: [
+        {
+          floorName: 'db',
+          worldMinXZ: { x: 0, z: 0 },
+          worldMaxXZ: { x: 1, z: 1 },
+          playableRectPx: { x: 0, y: 0, width: 1, height: 1 },
+          pixelW: 4096,
+          pixelH: 4096,
+          image: 'minimap/5c64e0fce9033160.png',
+          imageSize: [1024, 1024] as const,
+        },
+        {
+          floorName: 'db_2f',
+          worldMinXZ: { x: 0, z: 0 },
+          worldMaxXZ: { x: 1, z: 1 },
+          playableRectPx: { x: 0, y: 0, width: 1, height: 1 },
+          pixelW: 4096,
+          pixelH: 4096,
+          image: 'minimap/5f6b939e2f6cf19b.png',
+          imageSize: [1024, 1024] as const,
+        },
+      ],
+    };
+    expect(resolveFloorEntry(damirisLike, -1)?.image).toBe('minimap/5c64e0fce9033160.png');
+    expect(resolveFloorEntry(damirisLike, 1)?.image).toBe('minimap/5c64e0fce9033160.png');
+    expect(resolveFloorEntry(damirisLike, 2)?.image).toBe('minimap/5f6b939e2f6cf19b.png');
+    expect(resolveFloorEntry(damirisLike, null)?.image).toBe('minimap/5c64e0fce9033160.png');
+
+    // 潮汐监狱形态：1-4 层全部有专属贴图（cxjy_1f.._4f）。
+    const tideprisonFloors = [1, 2, 3, 4].map((floor) => ({
+      floorName: `cxjy${floor > 1 ? `_${floor}f` : '_1f'}`,
+      worldMinXZ: { x: 0, z: 0 },
+      worldMaxXZ: { x: 1, z: 1 },
+      playableRectPx: { x: 0, y: 0, width: 1, height: 1 },
+      pixelW: 4096,
+      pixelH: 4096,
+      image: `minimap/cxjy_${floor}f.png`,
+      imageSize: [1024, 1024] as const,
+    }));
+    const tideprisonLike = { ...FIXTURE_MAP2D, floors: tideprisonFloors };
+    for (const floor of [1, 2, 3, 4]) {
+      expect(resolveFloorEntry(tideprisonLike, floor)?.image).toBe(`minimap/cxjy_${floor}f.png`);
+    }
   });
 
   it('楼层标定转换与底图信息', () => {

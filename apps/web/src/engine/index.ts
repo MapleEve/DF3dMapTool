@@ -43,4 +43,10 @@ export type { ScreenAnchor } from './poiProjector';
 export { MapSceneLayer } from './mapScene';
 export type { ChunkProgressListener, ChunkStreamStats, MapSceneLayerOptions } from './mapScene';
 export { MapViewer } from './viewer';
-export type { ViewerLoadOptions, ViewerLoadState } from './viewer';
+export type { MapViewerOptions, ViewerLoadOptions, ViewerLoadState } from './viewer';
+
+// 导航网格（NavMesh）寻路
+export { NavMesh, NAVMESH_FORMAT, navMeshFromDoc } from './navmesh/navmesh';
+export type { NavPath, NavPoint, NavmeshDoc } from './navmesh/navmesh';
+export { NavPathLayer } from './navmesh/navPathLayer';
+export { NAVMESH_ENTRY, openNavMesh } from './navmesh/loader';

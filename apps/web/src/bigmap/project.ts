@@ -13,8 +13,8 @@ import type { BigmapCalibration, PixelPoint, UvPoint, WorldXZ } from './types';
  * 代入镜像后上式化为等价的 py 随管线 +z 增长形式（无翻转），见 pipelineWorldToPixel。
  *
  * 底图分辨率（1024/2048）只是同一虚拟网格的缩放采样，用归一化 UV 即与分辨率无关。
- * 反向映射（pipelinePixelToWorld）当前用于缩放锚点与 2D 标记落点换算；
- * 「2D 标记 → 3D 定位传送」按路线图在 M2 接线（3D 侧 flyTo 已就绪）。
+ * 反向映射（pipelinePixelToWorld）用于缩放锚点、2D 标记落点换算与「2D 标记 → 3D
+ * 定位传送」（3D 侧统一走 flyTo 缓动飞行）。
  */
 
 export function clamp01(value: number): number {

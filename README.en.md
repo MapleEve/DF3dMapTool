@@ -10,7 +10,7 @@
 <img src="https://img.shields.io/badge/node-%E2%89%A522-339933?style=flat-square&logo=nodedotjs&logoColor=white" alt="Node ≥ 22" />
 <img src="https://img.shields.io/badge/pnpm-workspace-F9AD00?style=flat-square&logo=pnpm&logoColor=black" alt="pnpm workspace" />
 <img src="https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black" alt="React 19" />
-<img src="https://img.shields.io/badge/three.js-latest-049EF4?style=flat-square&logo=threedotjs&logoColor=white" alt="three.js" />
+<img src="https://img.shields.io/badge/three.js-0.186-049EF4?style=flat-square&logo=threedotjs&logoColor=white" alt="three.js 0.186" />
 
 <br>
 
@@ -25,8 +25,8 @@
 DF3dMapTool is an open-source 3D tactical map viewer for Delta Force players.
 It runs in the browser on top of three.js and ships with **built-in map data packs**:
 
-- **6 switchable maps**: Zero Dam, Layali Grove, Brakkesh, Tide Prison, AZ3, and Space City
-  (data packs arrive with the repo over time; AZ3 is included today);
+- **6 switchable maps**: Zero Dam, Layali Grove, Brakkesh, Tide Prison, AZ3, and Space City —
+  every data pack ships with the repository, ready to use right after cloning;
 - **POI annotations and search**: filter by category, group by floor, fuzzy search by name;
 - **2D overhead overlay**: prebaked basemap + linear projection, sharing one world coordinate system with the 3D scene;
 - **Bilingual UI**: Chinese (default) and English.
@@ -35,21 +35,24 @@ It runs in the browser on top of three.js and ships with **built-in map data pac
 
 ## Features
 
-| Feature                       | Description                                                                      | Status |
-| ----------------------------- | -------------------------------------------------------------------------------- | ------ |
-| DMAP encrypted data pack      | AES-256-GCM encryption + integrity verification (tamper-proof, deterrence-level) | ✅     |
-| 3D scene skeleton             | three.js scene manager, layer lifecycle, render loop                             | ✅     |
-| Map registry                  | MapId ↔ asset code ↔ display name, floor calibration                             | ✅     |
-| Coordinate transform          | Euler (Y-X-Z) → quaternion → axis mirror, applied uniformly                      | ✅     |
-| 2D projection                 | Bidirectional world ↔ basemap pixel mapping, region display coords               | ✅     |
-| Bilingual UI                  | Full Chinese / English resources                                                 | ✅     |
-| 3D scene & orbit camera       | Data pack → scene layers → orbit camera, floor visibility, fly-to                | ✅     |
-| POI layer                     | Icon rendering, hover tooltips, detail panel, filtering and search               | ✅     |
-| 2D overhead overlay           | Basemap drawing, floor switching, markers, zoom, region labels                   | ✅     |
-| 2D marker teleport & minimap  | 2D marker → 3D fly-to teleport, HUD minimap                                      | 🚧 M2  |
-| Camera settings               | FOV / sensitivity / respawn settings UI                                          | 🚧 M2  |
-| Multi-map switching           | 6-map switching, mode selection                                                  | 🚧 M3  |
-| Polish                        | Mobile support, performance (batching/LOD/draw distance), loading experience     | 🚧 M4  |
+| Feature                      | Description                                                                                       | Status |
+| ---------------------------- | ------------------------------------------------------------------------------------------------- | ------ |
+| DMAP encrypted data pack     | AES-256-GCM encryption + integrity verification (tamper-proof, deterrence-level)                  | ✅     |
+| 3D scene skeleton            | three.js scene manager, layer lifecycle, render loop                                              | ✅     |
+| Map registry                 | MapId ↔ asset code ↔ display name, floor calibration                                              | ✅     |
+| Coordinate transform         | Euler (Y-X-Z) → quaternion → axis mirror, applied uniformly                                       | ✅     |
+| 2D projection                | Bidirectional world ↔ basemap pixel mapping, region display coords                                | ✅     |
+| Bilingual UI                 | Full Chinese / English resources                                                                  | ✅     |
+| 3D scene & orbit camera      | Data pack → scene layers → orbit camera, floor visibility, fly-to                                 | ✅     |
+| POI layer                    | Icon rendering, hover tooltips, detail panel, filtering and search                                | ✅     |
+| 2D overhead overlay          | Basemap drawing, floor switching, markers, zoom, region labels                                    | ✅     |
+| 2D marker teleport & minimap | 2D marker/POI → 3D fly-to teleport (cross-floor sync), HUD minimap                                | ✅     |
+| Camera settings              | FOV / sensitivity / respawn, persisted locally                                                    | ✅     |
+| Preference-only toggles      | Air jump / volume / ambient motes — stored locally as preferences only, no runtime effect yet | 🚧 M4  |
+| Multi-map switching          | 6-map switching, per-container cache, progress and failure states                                 | ✅     |
+| Map mode selection           | Filter data views by in-map mode                                                                  | 🚧 M3  |
+| Navigation routes            | NavMesh pathfinding (timed crate) — wired end to end, nav data shipped for 5/6 maps (AZ3 pending) | 🚧     |
+| Polish                       | Mobile support, performance (batching/LOD/draw distance), loading experience                      | 🚧 M4  |
 
 ---
 
@@ -85,6 +88,7 @@ A pnpm monorepo with two packages:
 
 ```
 DF3dMapTool/
+├── docs                     Data package docs and more
 ├── apps/web                 React 19 + Vite + three.js app
 │   └── src/
 │       ├── engine/          three.js scene manager, DMAP loader wiring, built-in key
@@ -130,16 +134,20 @@ format called **DMAP**:
 - See [packages/dmap/FORMAT.md](packages/dmap/FORMAT.md) for the byte-level layout and read flow.
 
 Data packs ship with the repository under `apps/web/public/assets/` — no extra steps after
-cloning. AZ3 is included today; the remaining maps will land in follow-up batches.
+cloning: **all 6 maps (AZ3, Zero Dam, Layali Grove, Brakkesh, Tide Prison, Space City) are
+ready**. See [docs/data-packages.en.md](docs/data-packages.en.md) for per-map scale,
+container layout and the data cleaning policy.
 
 ---
 
 ## Roadmap
 
-- **M1 single-map core**: full static AZ3 scene loading and roaming, POI icon layer, floor visibility, basemap alignment
-- **M2 full interactions**: first-person controller, POI search/detail/teleport, 2D overhead suite, navigation routes
-- **M3 multi-map**: 6-map switching, mode selection, region label layer
-- **M4 polish**: mobile support, performance (batching/LOD/draw distance), loading experience, i18n wrap-up
+- **M1 single-map core** ✅: full static AZ3 scene loading and roaming, POI icon layer, floor visibility, basemap alignment
+- **M2 core interactions** ✅: POI search/detail/fly-to teleport, full 2D overhead suite (markers/teleport/zoom/HUD minimap),
+  camera settings (FOV/sensitivity/respawn). Route system, draw-distance setting and a four-language UI are not covered
+  yet (see M3/M4); navigation routes (NavMesh pathfinding, data ready for 5/6 maps, AZ3 pending) 🚧
+- **M3 multi-map** ✅: 6-map switching (per-container cache, progress and failure states); mode selection, route system 🚧
+- **M4 polish** 🚧: mobile support, performance (batching/LOD/draw distance), functional preference toggles, loading experience, four-language wrap-up
 
 ---
 
