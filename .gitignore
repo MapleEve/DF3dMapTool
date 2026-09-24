@@ -1,0 +1,19 @@
+# 依赖与构建产物
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Vite / 本地环境
+*.local
+
+# 资产管线（不入仓：抽取与转换脚本、未加密中间产物）
+/df3d-pipeline/
+/pipeline/
+/tmp/
+*.upart
+*.dmapc
+
+# 杂项
+.DS_Store
+*.log

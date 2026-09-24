@@ -1,0 +1,22 @@
+{
+  "name": "@df3dmaptool/dmap",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "DMAP 加密地图数据容器：格式定义、Node 侧写入器与浏览器/Node 通用加载器",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.2",
+    "vitest": "^4.0.15"
+  }
+}
