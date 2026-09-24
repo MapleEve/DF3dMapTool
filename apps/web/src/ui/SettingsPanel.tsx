@@ -1,25 +1,25 @@
-import { useEffect, useState, type ChangeEvent } from 'react';
-import { useTranslation } from 'react-i18next';
-import { SUPPORTED_LANGUAGES, type Language } from '@/i18n';
+import { useEffect, useState, type ChangeEvent } from "react";
+import { useTranslation } from "react-i18next";
+import { SUPPORTED_LANGUAGES, type Language } from "@/i18n";
 import {
   FOV_RANGE,
   SENSITIVITY_RANGE,
   useUiStore,
   type FrameLimitLevel,
   type QualityLevel,
-} from '@/state/uiStore';
+} from "@/state/uiStore";
 
-const QUALITY_LEVELS: readonly QualityLevel[] = ['low', 'medium', 'high'];
-const FRAME_LIMIT_LEVELS: readonly FrameLimitLevel[] = ['unlimited', '60', '30'];
+const QUALITY_LEVELS: readonly QualityLevel[] = ["low", "medium", "high"];
+const FRAME_LIMIT_LEVELS: readonly FrameLimitLevel[] = ["unlimited", "60", "30"];
 
-type SettingsTab = 'graphics' | 'general';
+type SettingsTab = "graphics" | "general";
 
 /** 设置面板（双 Tab）：画面（画质/抗锯齿/帧率/全屏/视场角）与通用（语言/灵敏度/回出生点/源站对齐项）。 */
 export function SettingsPanel() {
   const { t } = useTranslation();
   const settingsOpen = useUiStore((state) => state.settingsOpen);
   const setSettingsOpen = useUiStore((state) => state.setSettingsOpen);
-  const [tab, setTab] = useState<SettingsTab>('graphics');
+  const [tab, setTab] = useState<SettingsTab>("graphics");
 
   // Esc 关闭（与源站菜单一致）。
   useEffect(() => {
@@ -27,12 +27,12 @@ export function SettingsPanel() {
       return;
     }
     const handleKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
+      if (event.key === "Escape") {
         setSettingsOpen(false);
       }
     };
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
   }, [settingsOpen, setSettingsOpen]);
 
   if (!settingsOpen) {
@@ -44,24 +44,28 @@ export function SettingsPanel() {
       <section
         className="settings-panel"
         role="dialog"
-        aria-label={t('settings.title')}
+        aria-label={t("settings.title")}
         onClick={(event) => event.stopPropagation()}
       >
         <header className="settings-header">
-          <h2>{t('settings.title')}</h2>
-          <button type="button" onClick={() => setSettingsOpen(false)} aria-label={t('common.close')}>
+          <h2>{t("settings.title")}</h2>
+          <button
+            type="button"
+            onClick={() => setSettingsOpen(false)}
+            aria-label={t("common.close")}
+          >
             ×
           </button>
         </header>
 
         <div className="settings-tabs" role="tablist">
-          {(['graphics', 'general'] as const).map((key) => (
+          {(["graphics", "general"] as const).map((key) => (
             <button
               key={key}
               type="button"
               role="tab"
               aria-selected={tab === key}
-              className={tab === key ? 'settings-tab active' : 'settings-tab'}
+              className={tab === key ? "settings-tab active" : "settings-tab"}
               onClick={() => setTab(key)}
             >
               {t(`settings.tabs.${key}`)}
@@ -69,10 +73,20 @@ export function SettingsPanel() {
           ))}
         </div>
 
-        {tab === 'graphics' ? <GraphicsTab /> : <GeneralTab />}
+        {tab === "graphics" ? <GraphicsTab /> : <GeneralTab />}
       </section>
     </div>
   );
+}
+
+/** 切换全屏（不依赖组件闭包；开关状态由 fullscreenchange 事件同步）。 */
+function toggleFullscreen(): void {
+  if (document.fullscreenElement) {
+    void document.exitFullscreen().catch(() => {});
+  } else {
+    // 浏览器要求全屏由用户手势触发；失败时静默（开关状态由事件同步）。
+    void document.documentElement.requestFullscreen().catch(() => {});
+  }
 }
 
 /** 画面 Tab：画质、抗锯齿、帧率上限、全屏、视场角。 */
@@ -91,23 +105,14 @@ function GraphicsTab() {
   // 跟随系统全屏状态（F11 / 浏览器控件也能改变）。
   useEffect(() => {
     const sync = () => setFullscreen(Boolean(document.fullscreenElement));
-    document.addEventListener('fullscreenchange', sync);
-    return () => document.removeEventListener('fullscreenchange', sync);
+    document.addEventListener("fullscreenchange", sync);
+    return () => document.removeEventListener("fullscreenchange", sync);
   }, []);
-
-  const toggleFullscreen = () => {
-    if (document.fullscreenElement) {
-      void document.exitFullscreen().catch(() => {});
-    } else {
-      // 浏览器要求全屏由用户手势触发；失败时静默（开关状态由事件同步）。
-      void document.documentElement.requestFullscreen().catch(() => {});
-    }
-  };
 
   return (
     <>
       <div className="settings-row">
-        <label htmlFor="settings-quality">{t('settings.quality')}</label>
+        <label htmlFor="settings-quality">{t("settings.quality")}</label>
         <select
           id="settings-quality"
           value={quality}
@@ -125,25 +130,25 @@ function GraphicsTab() {
           ))}
         </select>
       </div>
-      <p className="settings-hint">{t('settings.qualityHint')}</p>
+      <p className="settings-hint">{t("settings.qualityHint")}</p>
 
       <div className="settings-row">
-        <label htmlFor="settings-antialias">{t('settings.antialias')}</label>
+        <label htmlFor="settings-antialias">{t("settings.antialias")}</label>
         <button
           id="settings-antialias"
           type="button"
           role="switch"
           aria-checked={antialias}
-          className={antialias ? 'settings-switch on' : 'settings-switch'}
+          className={antialias ? "settings-switch on" : "settings-switch"}
           onClick={() => setAntialias(!antialias)}
         >
-          {antialias ? t('settings.on') : t('settings.off')}
+          {antialias ? t("settings.on") : t("settings.off")}
         </button>
       </div>
-      <p className="settings-hint">{t('settings.antialiasHint')}</p>
+      <p className="settings-hint">{t("settings.antialiasHint")}</p>
 
       <div className="settings-row">
-        <label htmlFor="settings-frame-limit">{t('settings.frameLimit')}</label>
+        <label htmlFor="settings-frame-limit">{t("settings.frameLimit")}</label>
         <select
           id="settings-frame-limit"
           value={frameLimit}
@@ -163,22 +168,22 @@ function GraphicsTab() {
       </div>
 
       <div className="settings-row">
-        <label htmlFor="settings-fullscreen">{t('settings.fullscreen')}</label>
+        <label htmlFor="settings-fullscreen">{t("settings.fullscreen")}</label>
         <button
           id="settings-fullscreen"
           type="button"
           role="switch"
           aria-checked={fullscreen}
-          className={fullscreen ? 'settings-switch on' : 'settings-switch'}
+          className={fullscreen ? "settings-switch on" : "settings-switch"}
           onClick={toggleFullscreen}
         >
-          {fullscreen ? t('settings.on') : t('settings.off')}
+          {fullscreen ? t("settings.on") : t("settings.off")}
         </button>
       </div>
-      <p className="settings-hint">{t('settings.fullscreenHint')}</p>
+      <p className="settings-hint">{t("settings.fullscreenHint")}</p>
 
       <div className="settings-row">
-        <label htmlFor="settings-fov">{t('settings.fov')}</label>
+        <label htmlFor="settings-fov">{t("settings.fov")}</label>
         <span className="settings-slider-value">{Math.round(fov)}°</span>
       </div>
       <input
@@ -219,21 +224,19 @@ function GeneralTab() {
   return (
     <>
       <div className="settings-row">
-        <label htmlFor="settings-language">{t('settings.language')}</label>
+        <label htmlFor="settings-language">{t("settings.language")}</label>
         <select id="settings-language" value={language} onChange={handleLanguageChange}>
           {SUPPORTED_LANGUAGES.map((code) => (
             <option key={code} value={code}>
-              {code === 'zh' ? '中文' : 'English'}
+              {code === "zh" ? "中文" : "English"}
             </option>
           ))}
         </select>
       </div>
 
       <div className="settings-row">
-        <label htmlFor="settings-sensitivity">{t('settings.sensitivity')}</label>
-        <span className="settings-slider-value">
-          {sensitivity.toFixed(2)}×
-        </span>
+        <label htmlFor="settings-sensitivity">{t("settings.sensitivity")}</label>
+        <span className="settings-slider-value">{sensitivity.toFixed(2)}×</span>
       </div>
       <input
         id="settings-sensitivity"
@@ -246,25 +249,30 @@ function GeneralTab() {
       />
 
       <div className="settings-row">
-        <label htmlFor="settings-respawn">{t('settings.respawn')}</label>
-        <button id="settings-respawn" type="button" className="settings-action" onClick={requestRespawn}>
-          {t('settings.respawnAction')}
+        <label htmlFor="settings-respawn">{t("settings.respawn")}</label>
+        <button
+          id="settings-respawn"
+          type="button"
+          className="settings-action"
+          onClick={requestRespawn}
+        >
+          {t("settings.respawnAction")}
         </button>
       </div>
 
       <div className="settings-row">
-        <label htmlFor="settings-air-jump">{t('settings.airJump')}</label>
+        <label htmlFor="settings-air-jump">{t("settings.airJump")}</label>
         <ToggleSwitch
           id="settings-air-jump"
           checked={airJump}
           onChange={setAirJump}
-          label={airJump ? t('settings.on') : t('settings.off')}
+          label={airJump ? t("settings.on") : t("settings.off")}
         />
       </div>
-      <p className="settings-hint">{t('settings.airJumpHint')}</p>
+      <p className="settings-hint">{t("settings.airJumpHint")}</p>
 
       <div className="settings-row">
-        <label htmlFor="settings-volume">{t('settings.volume')}</label>
+        <label htmlFor="settings-volume">{t("settings.volume")}</label>
         <span className="settings-slider-value">{Math.round(volume)}%</span>
       </div>
       <input
@@ -276,18 +284,18 @@ function GeneralTab() {
         value={Math.round(volume)}
         onChange={(event) => setVolume(Number(event.target.value))}
       />
-      <p className="settings-hint">{t('settings.volumeHint')}</p>
+      <p className="settings-hint">{t("settings.volumeHint")}</p>
 
       <div className="settings-row">
-        <label htmlFor="settings-ambient-motes">{t('settings.ambientMotes')}</label>
+        <label htmlFor="settings-ambient-motes">{t("settings.ambientMotes")}</label>
         <ToggleSwitch
           id="settings-ambient-motes"
           checked={ambientMotes}
           onChange={setAmbientMotes}
-          label={ambientMotes ? t('settings.on') : t('settings.off')}
+          label={ambientMotes ? t("settings.on") : t("settings.off")}
         />
       </div>
-      <p className="settings-hint">{t('settings.ambientMotesHint')}</p>
+      <p className="settings-hint">{t("settings.ambientMotesHint")}</p>
     </>
   );
 }
@@ -309,7 +317,7 @@ function ToggleSwitch({
       type="button"
       role="switch"
       aria-checked={checked}
-      className={checked ? 'settings-switch on' : 'settings-switch'}
+      className={checked ? "settings-switch on" : "settings-switch"}
       onClick={() => onChange(!checked)}
     >
       {label}

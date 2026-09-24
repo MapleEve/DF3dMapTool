@@ -1,7 +1,7 @@
-import { MathUtils, Vector3 } from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import type { PerspectiveCamera } from 'three';
-import type { Vec3 } from '@/common/geometry';
+import { MathUtils, Vector3 } from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import type { PerspectiveCamera } from "three";
+import type { Vec3 } from "@/common/geometry";
 
 const clamp = MathUtils.clamp;
 
@@ -89,7 +89,7 @@ export class MapCameraControls extends OrbitControls {
     this.screenSpacePanning = false;
 
     // 用户任何输入立即打断缓动飞行
-    this.addEventListener('start', () => this.cancelFlyTo());
+    this.addEventListener("start", () => this.cancelFlyTo());
     this.setFov(this.#limits.defaultFov);
   }
 

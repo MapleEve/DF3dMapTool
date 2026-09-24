@@ -1,19 +1,19 @@
-import { useTranslation } from 'react-i18next';
-import type { MapLoadErrorCode } from '@/data';
-import { getMapById } from '@/map';
-import { useFloorStore } from '@/state/floorStore';
-import { useMapDataStore } from '@/state/mapDataStore';
-import { useMapStore } from '@/state/mapStore';
-import { useUiStore } from '@/state/uiStore';
+import { useTranslation } from "react-i18next";
+import type { MapLoadErrorCode } from "@/data";
+import { getMapById } from "@/map";
+import { useFloorStore } from "@/state/floorStore";
+import { useMapDataStore } from "@/state/mapDataStore";
+import { useMapStore } from "@/state/mapStore";
+import { useUiStore } from "@/state/uiStore";
 
 function errorMessageKey(errorCode: MapLoadErrorCode) {
   switch (errorCode) {
-    case 'unavailable':
-      return 'errors.unavailable' as const;
-    case 'corrupt':
-      return 'errors.corrupt' as const;
-    case 'unknown':
-      return 'errors.unknown' as const;
+    case "unavailable":
+      return "errors.unavailable" as const;
+    case "corrupt":
+      return "errors.corrupt" as const;
+    case "unknown":
+      return "errors.unknown" as const;
   }
 }
 
@@ -31,33 +31,37 @@ export function StatusBar() {
   const definition = getMapById(mapId);
 
   const statusText =
-    status === 'ready'
-      ? t('status.ready')
-      : status === 'loading'
-        ? t('status.loading')
-        : status === 'error'
-          ? t(errorMessageKey(errorCode ?? 'unknown'))
-          : t('status.idle');
+    status === "ready"
+      ? t("status.ready")
+      : status === "loading"
+        ? t("status.loading")
+        : status === "error"
+          ? t(errorMessageKey(errorCode ?? "unknown"))
+          : t("status.idle");
 
   return (
     <footer className="status-bar">
       <span>{definition === undefined ? mapId : t(definition.nameKey)}</span>
-      <span>{floor < 0 ? t('floor.basement', { floor: Math.abs(floor) }) : t('floor.floorName', { floor })}</span>
+      <span>
+        {floor < 0
+          ? t("floor.basement", { floor: Math.abs(floor) })
+          : t("floor.floorName", { floor })}
+      </span>
       {instanceCount !== null ? (
-        <span>{t('status.placements', { count: instanceCount })}</span>
+        <span>{t("status.placements", { count: instanceCount })}</span>
       ) : definition?.knownPlacementCount !== undefined ? (
-        <span>{t('status.placements', { count: definition.knownPlacementCount })}</span>
+        <span>{t("status.placements", { count: definition.knownPlacementCount })}</span>
       ) : null}
       {cameraHud !== null ? (
         <span className="status-coords">
           <span className="status-compass" aria-hidden="true">
             N↑
           </span>
-          {t('hud.worldCoords')}:{' '}
+          {t("hud.worldCoords")}:{" "}
           {`${cameraHud.position.x.toFixed(1)}, ${cameraHud.position.y.toFixed(1)}, ${cameraHud.position.z.toFixed(1)}`}
         </span>
       ) : null}
-      <span className={status === 'error' ? 'status-text status-error' : 'status-text'}>
+      <span className={status === "error" ? "status-text status-error" : "status-text"}>
         {statusText}
       </span>
       <div className="status-actions">
@@ -66,10 +70,10 @@ export function StatusBar() {
           disabled={screenshotHandler === null}
           onClick={() => screenshotHandler?.()}
         >
-          {t('hud.screenshot')}
+          {t("hud.screenshot")}
         </button>
         <button type="button" onClick={() => setSettingsOpen(true)}>
-          {t('settings.title')}
+          {t("settings.title")}
         </button>
       </div>
     </footer>

@@ -33,6 +33,47 @@
   transition: width 0.15s ease;
 }
 
+/* ---------- 场景流式进度（就绪后的分块加载） ---------- */
+
+.stream-progress {
+  position: absolute;
+  /* 左侧 280px 是侧栏（POI 面板）：留 16px 间距贴其右侧，
+   * 与右下小地图同处一行，避免被侧栏盖住。 */
+  left: 296px;
+  bottom: 44px;
+  z-index: 15;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 168px;
+  padding: 8px 10px;
+  background: rgba(8, 12, 17, 0.88);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.stream-progress-failed {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.stream-progress-bar {
+  height: 3px;
+  background: rgba(90, 169, 255, 0.15);
+}
+
+.stream-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.15s ease;
+}
+
+.stream-progress-failed .stream-progress-fill {
+  background: var(--danger);
+}
+
 /* ---------- 顶栏 ---------- */
 
 .topbar {
@@ -802,7 +843,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-.settings-row input[type='range'] {
+.settings-row input[type="range"] {
   width: 100%;
   margin: 0 0 12px;
   accent-color: #4a90d9;

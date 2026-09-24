@@ -7,8 +7,8 @@
 > _「An open-source 3D tactical map viewer for Delta Force players — 6 switchable maps, POI annotations with search, and a 2D overhead overlay.」_
 
 <a href="https://github.com/MapleEve/DF3dMapTool/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/MapleEve/DF3dMapTool/ci.yml?branch=main&style=flat-square&label=CI&logo=githubactions&logoColor=white" alt="CI" /></a>
-<img src="https://img.shields.io/badge/node-%E2%89%A522-339933?style=flat-square&logo=nodedotjs&logoColor=white" alt="Node ≥ 22" />
-<img src="https://img.shields.io/badge/pnpm-workspace-F9AD00?style=flat-square&logo=pnpm&logoColor=black" alt="pnpm workspace" />
+<img src="https://img.shields.io/badge/bun-%E2%89%A51.3-000000?style=flat-square&logo=bun&logoColor=white" alt="bun ≥ 1.3" />
+<img src="https://img.shields.io/badge/lint-oxlint-1A1A1A?style=flat-square&logo=oxlint&logoColor=white" alt="oxlint" />
 <img src="https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black" alt="React 19" />
 <img src="https://img.shields.io/badge/three.js-0.186-049EF4?style=flat-square&logo=threedotjs&logoColor=white" alt="three.js 0.186" />
 
@@ -48,7 +48,7 @@ It runs in the browser on top of three.js and ships with **built-in map data pac
 | 2D overhead overlay          | Basemap drawing, floor switching, markers, zoom, region labels                                    | ✅     |
 | 2D marker teleport & minimap | 2D marker/POI → 3D fly-to teleport (cross-floor sync), HUD minimap                                | ✅     |
 | Camera settings              | FOV / sensitivity / respawn, persisted locally                                                    | ✅     |
-| Preference-only toggles      | Air jump / volume / ambient motes — stored locally as preferences only, no runtime effect yet | 🚧 M4  |
+| Preference-only toggles      | Air jump / volume / ambient motes — stored locally as preferences only, no runtime effect yet     | 🚧 M4  |
 | Multi-map switching          | 6-map switching, per-container cache, progress and failure states                                 | ✅     |
 | Map mode selection           | Filter data views by in-map mode                                                                  | 🚧 M3  |
 | Navigation routes            | NavMesh pathfinding (timed crate) — wired end to end, nav data shipped for 5/6 maps (AZ3 pending) | 🚧     |
@@ -58,33 +58,38 @@ It runs in the browser on top of three.js and ships with **built-in map data pac
 
 ## Quick start
 
-Requirements: Node.js ≥ 22 and pnpm ≥ 10.
+Requirements: [bun](https://bun.sh) ≥ 1.3 (bundles the runtime, package manager and test
+runner — no separate Node / pnpm install needed).
 
 ```bash
 git clone https://github.com/MapleEve/DF3dMapTool.git
 cd DF3dMapTool
-pnpm install
-pnpm dev
+bun install
+bun run dev
 ```
 
 Then open <http://localhost:5173>.
 
 Common commands:
 
-| Command          | Description                                        |
-| ---------------- | -------------------------------------------------- |
-| `pnpm dev`       | Start the dev server                               |
-| `pnpm build`     | Build the whole workspace (type check + artifacts) |
-| `pnpm test`      | Run all unit tests (vitest)                        |
-| `pnpm lint`      | Run ESLint                                         |
-| `pnpm typecheck` | Strict TypeScript check                            |
-| `pnpm format`    | Format with Prettier                               |
+| Command                | Description                                        |
+| ---------------------- | -------------------------------------------------- |
+| `bun run dev`          | Start the dev server                               |
+| `bun run build`        | Build the whole workspace (type check + artifacts) |
+| `bun test`             | Run all unit tests (bun's native test runner)      |
+| `bun run lint`         | Run oxlint                                         |
+| `bun run typecheck`    | Strict TypeScript check                            |
+| `bun run format`       | Format with oxfmt                                  |
+| `bun run format:check` | oxfmt format check (CI gate)                       |
+
+CI (GitHub Actions) runs the same five gates — lint / typecheck / test / build /
+format:check — on bun 1.3 via [oven-sh/setup-bun](https://github.com/oven-sh/setup-bun).
 
 ---
 
 ## Architecture
 
-A pnpm monorepo with two packages:
+A bun workspace monorepo with two packages:
 
 ```
 DF3dMapTool/

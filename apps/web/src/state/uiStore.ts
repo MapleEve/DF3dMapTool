@@ -1,9 +1,9 @@
-import { create } from 'zustand';
-import type { Vec3 } from '@/common/geometry';
-import { changeLanguage, DEFAULT_LANGUAGE, LANGUAGE_STORAGE_KEY, type Language } from '@/i18n';
+import { create } from "zustand";
+import type { Vec3 } from "@/common/geometry";
+import { changeLanguage, DEFAULT_LANGUAGE, LANGUAGE_STORAGE_KEY, type Language } from "@/i18n";
 
 /** 画质档位：映射到渲染像素比上限（低 1 / 中 1.5 / 高 2）。 */
-export type QualityLevel = 'low' | 'medium' | 'high';
+export type QualityLevel = "low" | "medium" | "high";
 
 export const QUALITY_PIXEL_RATIO: Readonly<Record<QualityLevel, number>> = {
   low: 1,
@@ -20,26 +20,26 @@ export const SENSITIVITY_RANGE = [0.2, 3] as const;
 export const SENSITIVITY_DEFAULT = 1;
 
 /** 帧率上限档位：null 为不限（跟随显示器刷新率）。 */
-export type FrameLimitLevel = 'unlimited' | '30' | '60';
+export type FrameLimitLevel = "unlimited" | "30" | "60";
 export const FRAME_LIMIT_FPS: Readonly<Record<FrameLimitLevel, number | null>> = {
   unlimited: null,
-  '30': 30,
-  '60': 60,
+  "30": 30,
+  "60": 60,
 };
 
-const STORAGE_KEY_QUALITY = 'df3dmaptool:quality';
-const STORAGE_KEY_FOV = 'df3dmaptool:fov';
-const STORAGE_KEY_SENSITIVITY = 'df3dmaptool:sensitivity';
-const STORAGE_KEY_FRAME_LIMIT = 'df3dmaptool:frameLimit';
-const STORAGE_KEY_ANTIALIAS = 'df3dmaptool:antialias';
-const STORAGE_KEY_AIR_JUMP = 'df3dmaptool:airJump';
-const STORAGE_KEY_VOLUME = 'df3dmaptool:volume';
-const STORAGE_KEY_AMBIENT_MOTES = 'df3dmaptool:ambientMotes';
+const STORAGE_KEY_QUALITY = "df3dmaptool:quality";
+const STORAGE_KEY_FOV = "df3dmaptool:fov";
+const STORAGE_KEY_SENSITIVITY = "df3dmaptool:sensitivity";
+const STORAGE_KEY_FRAME_LIMIT = "df3dmaptool:frameLimit";
+const STORAGE_KEY_ANTIALIAS = "df3dmaptool:antialias";
+const STORAGE_KEY_AIR_JUMP = "df3dmaptool:airJump";
+const STORAGE_KEY_VOLUME = "df3dmaptool:volume";
+const STORAGE_KEY_AMBIENT_MOTES = "df3dmaptool:ambientMotes";
 
 function readStoredLanguage(): Language {
   try {
     const stored = localStorage.getItem(LANGUAGE_STORAGE_KEY);
-    return stored === 'en' || stored === 'zh' ? stored : DEFAULT_LANGUAGE;
+    return stored === "en" || stored === "zh" ? stored : DEFAULT_LANGUAGE;
   } catch {
     return DEFAULT_LANGUAGE;
   }
@@ -48,9 +48,9 @@ function readStoredLanguage(): Language {
 function readStoredQuality(): QualityLevel {
   try {
     const stored = localStorage.getItem(STORAGE_KEY_QUALITY);
-    return stored === 'low' || stored === 'medium' || stored === 'high' ? stored : 'high';
+    return stored === "low" || stored === "medium" || stored === "high" ? stored : "high";
   } catch {
-    return 'high';
+    return "high";
   }
 }
 
@@ -76,16 +76,16 @@ function readStoredNumber(key: string, range: readonly [number, number], fallbac
 function readStoredFrameLimit(): FrameLimitLevel {
   try {
     const stored = localStorage.getItem(STORAGE_KEY_FRAME_LIMIT);
-    return stored === '30' || stored === '60' || stored === 'unlimited' ? stored : 'unlimited';
+    return stored === "30" || stored === "60" || stored === "unlimited" ? stored : "unlimited";
   } catch {
-    return 'unlimited';
+    return "unlimited";
   }
 }
 
 function readStoredBoolean(key: string, fallback: boolean): boolean {
   try {
     const stored = localStorage.getItem(key);
-    return stored === null ? fallback : stored === '1';
+    return stored === null ? fallback : stored === "1";
   } catch {
     return fallback;
   }
@@ -197,11 +197,11 @@ export const useUiStore = create<UiStoreState>()((set, get) => ({
     set({ frameLimit });
   },
   setAntialias: (antialias) => {
-    persist(STORAGE_KEY_ANTIALIAS, antialias ? '1' : '0');
+    persist(STORAGE_KEY_ANTIALIAS, antialias ? "1" : "0");
     set({ antialias });
   },
   setAirJump: (airJump) => {
-    persist(STORAGE_KEY_AIR_JUMP, airJump ? '1' : '0');
+    persist(STORAGE_KEY_AIR_JUMP, airJump ? "1" : "0");
     set({ airJump });
   },
   setVolume: (volume) => {
@@ -210,7 +210,7 @@ export const useUiStore = create<UiStoreState>()((set, get) => ({
     set({ volume: next });
   },
   setAmbientMotes: (ambientMotes) => {
-    persist(STORAGE_KEY_AMBIENT_MOTES, ambientMotes ? '1' : '0');
+    persist(STORAGE_KEY_AMBIENT_MOTES, ambientMotes ? "1" : "0");
     set({ ambientMotes });
   },
   setCameraHud: (cameraHud) => set({ cameraHud }),

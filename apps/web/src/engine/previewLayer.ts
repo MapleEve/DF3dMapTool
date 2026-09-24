@@ -1,5 +1,5 @@
-import { DirectionalLight, GridHelper, Group } from 'three';
-import type { EngineLayer } from './SceneManager';
+import { DirectionalLight, GridHelper, Group } from "three";
+import type { EngineLayer } from "./SceneManager";
 
 /**
  * M1 前的场景占位层：网格地面 + 平行光，
@@ -7,10 +7,10 @@ import type { EngineLayer } from './SceneManager';
  */
 export function createPreviewLayer(): EngineLayer {
   const root = new Group();
-  root.name = 'preview-layer';
+  root.name = "preview-layer";
 
   const grid = new GridHelper(256, 64, 0x2f4a66, 0x18222e);
-  grid.name = 'preview-grid';
+  grid.name = "preview-grid";
   root.add(grid);
 
   const sun = new DirectionalLight(0xffffff, 1.4);
@@ -19,7 +19,7 @@ export function createPreviewLayer(): EngineLayer {
   root.add(sun);
 
   return {
-    id: 'preview',
+    id: "preview",
     root,
     dispose() {
       grid.dispose();

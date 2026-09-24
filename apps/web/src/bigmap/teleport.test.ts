@@ -1,7 +1,7 @@
-import { describe, expect, it } from 'vitest';
-import { pipelineWorldToPixel } from './project';
-import { markerPixelToWorld, planTeleport, resolveTeleportFloor } from './teleport';
-import type { BigmapCalibration } from './types';
+import { describe, expect, it } from "vitest";
+import { pipelineWorldToPixel } from "./project";
+import { markerPixelToWorld, planTeleport, resolveTeleportFloor } from "./teleport";
+import type { BigmapCalibration } from "./types";
 
 /**
  * 传送链路单测（#29 右键标记/POI 点击 → 3D flyTo）：
@@ -19,8 +19,8 @@ const az3Calibration: BigmapCalibration = {
 /** AZ3 数据包楼层表（manifest.floors 同构）。 */
 const AZ3_FLOORS: readonly number[] = [1, 2, 3];
 
-describe('2D 标记 → 3D 传送', () => {
-  it('点击像素 → 世界落点 → 回投像素，与点击位置往返一致', () => {
+describe("2D 标记 → 3D 传送", () => {
+  it("点击像素 → 世界落点 → 回投像素，与点击位置往返一致", () => {
     // 模拟大地图画布点击：可玩区内一点（虚拟网格像素）。
     const clickPixel = { x: 3381.8, y: 2902.6 };
     const world = markerPixelToWorld(clickPixel, az3Calibration);
@@ -35,7 +35,7 @@ describe('2D 标记 → 3D 传送', () => {
     expect(back.y).toBeCloseTo(clickPixel.y, 6);
   });
 
-  it('planTeleport 产出 3D 落点（标记高度缺省 0，POI 高度透传）', () => {
+  it("planTeleport 产出 3D 落点（标记高度缺省 0，POI 高度透传）", () => {
     const marker = planTeleport({
       world: { x: -2000, z: -2000 },
       targetFloor: null,
@@ -56,7 +56,7 @@ describe('2D 标记 → 3D 传送', () => {
     expect(poi.position.y).toBeCloseTo(12.5, 9);
   });
 
-  it('跨层传送楼层同步：目标楼层合法才写入，否则保持当前层', () => {
+  it("跨层传送楼层同步：目标楼层合法才写入，否则保持当前层", () => {
     const crossFloor = planTeleport({
       world: { x: -2000, z: -2000 },
       targetFloor: 3,
@@ -77,7 +77,7 @@ describe('2D 标记 → 3D 传送', () => {
     expect(invalid.floorChanged).toBe(false);
   });
 
-  it('全图概览落点（targetFloor=null）不切层', () => {
+  it("全图概览落点（targetFloor=null）不切层", () => {
     const plan = planTeleport({
       world: { x: -1800, z: -1600 },
       targetFloor: null,
@@ -88,7 +88,7 @@ describe('2D 标记 → 3D 传送', () => {
     expect(plan.floorChanged).toBe(false);
   });
 
-  it('resolveTeleportFloor：POI 自身楼层优先，楼层 0（全楼层）回落大地图页签', () => {
+  it("resolveTeleportFloor：POI 自身楼层优先，楼层 0（全楼层）回落大地图页签", () => {
     expect(resolveTeleportFloor(2, 1)).toBe(2);
     expect(resolveTeleportFloor(0, null)).toBeNull();
     expect(resolveTeleportFloor(0, 3)).toBe(3);

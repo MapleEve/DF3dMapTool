@@ -8,7 +8,7 @@ import {
   PerspectiveCamera,
   Scene,
   WebGLRenderer,
-} from 'three';
+} from "three";
 
 /** 场景中的一层内容（楼层组、标注层、地面等），由 SceneManager 统一调度生命周期。 */
 export interface EngineLayer {
@@ -32,7 +32,7 @@ export interface SceneManagerOptions {
   readonly frameLimit?: number | null;
 }
 
-const DEFAULT_OPTIONS: Required<Omit<SceneManagerOptions, 'frameLimit'>> & {
+const DEFAULT_OPTIONS: Required<Omit<SceneManagerOptions, "frameLimit">> & {
   frameLimit: number | null;
 } = {
   fov: 70,
@@ -56,7 +56,7 @@ export class SceneManager {
   readonly renderer: WebGLRenderer;
 
   readonly #canvas: HTMLCanvasElement;
-  readonly #options: Required<Omit<SceneManagerOptions, 'frameLimit'>> & {
+  readonly #options: Required<Omit<SceneManagerOptions, "frameLimit">> & {
     frameLimit: number | null;
   };
   readonly #layers: EngineLayer[] = [];
@@ -76,7 +76,7 @@ export class SceneManager {
     this.renderer = new WebGLRenderer({
       canvas,
       antialias: this.#options.antialias,
-      powerPreference: 'high-performance',
+      powerPreference: "high-performance",
     });
     this.renderer.setPixelRatio(
       Math.min(window.devicePixelRatio, this.#options.maxDevicePixelRatio),
@@ -172,6 +172,8 @@ export class SceneManager {
     this.stop();
     this.#resizeObserver?.disconnect();
     this.#resizeObserver = null;
+    // 迭代中 removeLayer 会原地变更 #layers，需快照副本避免跳元素。
+    // oxlint-disable-next-line unicorn/no-useless-spread
     for (const layer of [...this.#layers]) {
       this.removeLayer(layer.id);
     }

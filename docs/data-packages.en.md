@@ -3,30 +3,35 @@
 # Map Data Packages
 
 All built-in maps ship with the repository as **DMAP encrypted containers** (`.dmap`)
-under `apps/web/public/assets/<code>.dmap`. Cloning the repo is all it takes — no extra
-downloads or generation steps.
+under `apps/web/public/assets/<code>/`. Each map is split into a set of independent
+containers: the index container renders the UI as soon as it arrives, while 3D chunk
+and navigation containers are fetched on demand. Cloning the repo is all it takes —
+no extra downloads or generation steps.
 
 ## 1. Shipped packages
 
 The table below reflects the actual scale of the 6 shipped maps, inventoried from each
-container's manifest and JSON configs:
+index container's manifest and JSON configs:
 
-| Code        | Map          | MapId | Floors   | 3D chunks | Placements | POIs (total / active / with icon) | Icons | 2D layers | Regions | Size    |
-| ----------- | ------------ | ----- | -------- | --------- | ---------- | --------------------------------- | ----- | --------- | ------- | ------- |
-| az3         | AZ3          | 106   | 1–3      | 96        | 45,595     | 146 / 146 / 146                   | 34    | 4         | 13      | 36.3 MB |
-| damiris     | Zero Dam     | 101   | B1, 1, 2 | 76        | 42,830     | 557 / 553 / 480                   | 55    | 2         | 6       | 18.7 MB |
-| forrest     | Layali Grove | 102   | 1        | 139       | 52,472     | 688 / 473 / 620                   | 54    | 1         | 14      | 26.4 MB |
-| brakkesh    | Brakkesh     | 104   | 1        | 39        | 28,045     | 803 / 801 / 700                   | 54    | 1         | 9       | 13.2 MB |
-| tideprison  | Tide Prison  | 105   | 1–4      | 54        | 28,079     | 915 / 914 / 702                   | 56    | 5         | 16      | 15.6 MB |
-| spacecenter | Space City   | 203   | 1–2      | 48        | 23,395     | 591 / 589 / 476                   | 56    | 3         | 18      | 14.3 MB |
+| Code        | Map          | MapId | Floors   | 3D chunks | Placements | POIs (total / active / with icon) | Icons | 2D layers | Regions | Index   | Chunks total | Nav     |
+| ----------- | ------------ | ----- | -------- | --------- | ---------- | --------------------------------- | ----- | --------- | ------- | ------- | ------------ | ------- |
+| az3         | AZ3          | 106   | 1–3      | 96        | 45,595     | 146 / 146 / 146                   | 34    | 4         | 13      | 15.8 MB | 18.8 MB      | —       |
+| damiris     | Zero Dam     | 101   | B1, 1, 2 | 76        | 42,830     | 557 / 553 / 480                   | 55    | 2         | 6       | 2.6 MB  | 15.2 MB      | 13.8 MB |
+| forrest     | Layali Grove | 102   | 1        | 139       | 52,472     | 688 / 473 / 620                   | 54    | 1         | 14      | 2.5 MB  | 22.7 MB      | 7.8 MB  |
+| brakkesh    | Brakkesh     | 104   | 1        | 39        | 28,045     | 803 / 801 / 700                   | 54    | 1         | 9       | 2.9 MB  | 9.7 MB       | 12.0 MB |
+| tideprison  | Tide Prison  | 105   | 1–4      | 54        | 28,079     | 915 / 914 / 702                   | 56    | 5         | 16      | 4.2 MB  | 10.7 MB      | 20.4 MB |
+| spacecenter | Space City   | 203   | 1–2      | 48        | 23,395     | 591 / 589 / 476                   | 56    | 3         | 18      | 3.5 MB  | 10.1 MB      | 4.4 MB  |
 
 Notes:
 
-- **Floors**: the 3D scene and floor tabs follow the container manifest's `floors`;
+- **Sharded layout**: each map lives in one directory `assets/<code>/` containing
+  `index.dmap` (index container), `chunks/c_<x>_<y>.dmap` (one container per chunk)
+  and `nav.dmap` (navigation container, optional). Every single file stays below 90 MB.
+- **Floors**: the 3D scene and floor tabs follow the index container manifest's `floors`;
   the values match the static registry.
-- **Navigation data**: besides scene containers, encrypted navigation containers
-  (`<code>.nav.dmap`, pathfinding meshes) ship for 5 of the 6 maps (all but AZ3);
-  the routing entry hides automatically when a nav container is not available.
+- **Navigation data**: encrypted navigation containers (pathfinding meshes) ship for 5 of
+  the 6 maps (all but AZ3); the routing entry hides automatically when a nav container
+  is not available.
 - **2D layers**: includes the overview layer. Some floors have no dedicated baked image
   (e.g. Zero Dam B1 and floor 1); they fall back to the overview at runtime — this is not
   missing data.
@@ -40,24 +45,26 @@ Notes:
 
 ## 2. Container layout
 
-Each `.dmap` carries one map's full data plus the index summary of all 6 maps:
+Each map's data is split into three groups of independent DMAP containers:
 
 ```
-manifest.json                  dmap-map-manifest/2: maps[] index (6 entries)
-  ├─ summary entries: mapId / code / floors / containers / counts
-  └─ the map hosted by this container additionally carries:
-       entries       in-container paths for scene / poi / map2d / configs[4] / icons / minimaps
-       chunkBounds   3D chunk bounds (streamed loading and framing)
-maps/<code>/scene.json         floor values, scene bounds, floor triggers
-maps/<code>/poi.json           full POI list (coords, floors, icons, visibility)
-maps/<code>/map2d.json         per-floor 2D calibration (world extents ↔ pixels)
-chunks/b*.glb                  3D chunk geometry (instanced placements)
-configs/                       type / item / region / map config tables (cleaned)
-icons/index.json               icon index (business key → hashed file path + size)
-minimap/index.json             basemap index (business key → hashed file path + size)
+assets/<code>/index.dmap          index container (dmap-map-manifest/3)
+  manifest.json                   per-map manifest: map/floors/counts/entries + chunks index
+  maps/<code>/scene.json          floor values, scene bounds, floor triggers
+  maps/<code>/poi.json            full POI list (coords, floors, icons, visibility)
+  maps/<code>/map2d.json          per-floor 2D calibration (world extents ↔ pixels)
+  configs/                        type / item / region / map config tables (cleaned)
+  icons/                          icon index and PNGs (hash file names)
+  minimap/                        basemap index and PNGs (hash file names)
+
+assets/<code>/chunks/c_<x>_<y>.dmap   chunk container: single entry chunk.glb (instanced geometry)
+assets/<code>/nav.dmap                navigation container: single entry navmesh.json (nav mesh)
 ```
 
-Encryption and the byte-level layout (magic, AES-256-GCM, dmapc index, key derivation)
+The manifest's `chunks[]` is the chunk index: container file name, byte scales
+(raw GLB / in-container payload / sealed container), instance counts and AABBs, used by
+the engine for on-demand loading, framing and progress aggregation. Encryption and the
+byte-level layout (magic, AES-256-GCM, dmapc index, key derivation, two-stage loading)
 are specified in [packages/dmap/FORMAT.md](../packages/dmap/FORMAT.md). Honest protection
 statement: container tamper-proofing is fully effective; key material ships with the
 client, so extraction protection is deterrence-level.
@@ -111,10 +118,14 @@ per map by the real-container regression in `apps/web/src/data/loadMap.test.ts`.
 
 ## 4. Loading behavior and failure states
 
-- **Switch cache**: a container's download + verification result is cached per MapId;
-  switching back never re-downloads.
-- **Progress**: container download contributes ~70% of the progress bar; the rest is
-  driven by streamed 3D chunk loading.
+- **Two-stage loading**: switching maps fetches only the index container (a few MB;
+  progress 0 → UI ready) — POI/2D/config data renders with the index; 3D chunk
+  containers are pulled in parallel by the engine as the camera needs them
+  (concurrency pool of 6, 1 retry on failure), with total progress aggregated across
+  streams as loaded instances / total instances;
+- **Switch cache**: a package's index download + verification result is cached per
+  MapId; switching back never re-downloads. Chunk containers stay cached until the
+  map is unloaded;
 - **Three failure states**: missing container or network failure → `unavailable`
   (the switcher shows "data pack in preparation" with a retry action); integrity or
   manifest failure → `corrupt`; anything else → `unknown`. The status bar shows the

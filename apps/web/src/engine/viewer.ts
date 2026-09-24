@@ -1,30 +1,28 @@
-import { Group } from 'three';
-import type { DmapLoader } from '@df3dmaptool/dmap';
-import { AssetFetchError } from './assets';
-import type { Vec3 } from '@/common/geometry';
-import type { MapCode, MapId } from '@/map';
-import { getMapById } from '@/map';
-import { DmapMapBundle, readSceneDoc, type SceneDoc } from './mapBundle';
-import { connectFloorStore } from './floorBinding';
-import { FloorManager } from './floorManager';
-import { MapCameraControls } from './cameraControls';
-import { MapSceneLayer } from './mapScene';
-import { projectToScreen, type ScreenAnchor } from './poiProjector';
-import type { ChunkProgressListener, ChunkStreamStats } from './mapScene';
-import { SceneManager } from './SceneManager';
-import { NavPathLayer } from './navmesh/navPathLayer';
-import { openNavMesh } from './navmesh/loader';
-import type { NavMesh, NavPath } from './navmesh/navmesh';
+import { Group } from "three";
+import type { DmapMapPackage } from "@df3dmaptool/dmap";
+import { AssetFetchError, openMapPackage } from "./assets";
+import type { Vec3 } from "@/common/geometry";
+import type { MapCode, MapId } from "@/map";
+import { getMapById } from "@/map";
+import { readSceneDoc, type SceneDoc } from "./mapBundle";
+import { connectFloorStore } from "./floorBinding";
+import { FloorManager } from "./floorManager";
+import { MapCameraControls } from "./cameraControls";
+import { MapSceneLayer } from "./mapScene";
+import { projectToScreen, type ScreenAnchor } from "./poiProjector";
+import type { ChunkProgressListener, ChunkStreamStats } from "./mapScene";
+import { SceneManager } from "./SceneManager";
+import { NavPathLayer } from "./navmesh/navPathLayer";
+import { openNavMesh } from "./navmesh/loader";
+import type { NavMesh, NavPath } from "./navmesh/navmesh";
 
-const CAMERA_LAYER_ID = 'camera-controls';
+const CAMERA_LAYER_ID = "camera-controls";
 
-/** loadMap 可选项：数据层已打开容器时复用，避免同一数据包重复下载/解密。 */
+/** loadMap 可选项：数据层已打开分片包时复用，避免同一数据包重复下载/解密。 */
 export interface ViewerLoadOptions {
-  /** 已通过完整性校验的容器加载器（作为首容器复用）。 */
-  readonly loader?: DmapLoader;
-  /** 容器基地址（清单声明多容器时按需加载相邻分片用；缺省用注册表地址）。 */
-  readonly baseUrl?: string;
-  /** chunk 流式加载进度回调。 */
+  /** 数据层已打开的分片包（索引容器已就绪）；缺省按注册表地址拉取。 */
+  readonly pkg?: DmapMapPackage;
+  /** 分块流式加载进度回调。 */
   readonly onProgress?: ChunkProgressListener;
 }
 
@@ -52,7 +50,7 @@ export class MapViewer {
   readonly #floorManager = new FloorManager({ dimInactive: true, dimOpacity: 0.18 });
   #controls: MapCameraControls | null = null;
   #mapLayer: MapSceneLayer | null = null;
-  #bundle: DmapMapBundle | null = null;
+  #pkg: DmapMapPackage | null = null;
   #unsubscribeFloor: (() => void) | null = null;
   #sceneDoc: SceneDoc | null = null;
   #mapCode: MapCode | null = null;
@@ -73,7 +71,7 @@ export class MapViewer {
 
   get controls(): MapCameraControls {
     if (this.#controls === null) {
-      throw new Error('相机控制尚未就绪：先调用 loadMap');
+      throw new Error("相机控制尚未就绪：先调用 loadMap");
     }
     return this.#controls;
   }
@@ -88,8 +86,8 @@ export class MapViewer {
 
   /**
    * 加载并显示一张地图；重复调用会先释放上一张图。
-   * options.loader 传入数据层已打开的容器时不再重复拉取；
-   * options.onProgress 在 chunk 增量加载时回调（首屏进度条用）。
+   * options.pkg 传入数据层已打开的分片包时不再重复拉取索引容器；
+   * options.onProgress 在分块流式加载时回调（跨流聚合进度）。
    */
   async loadMap(mapId: MapId, options: ViewerLoadOptions = {}): Promise<SceneDoc> {
     const definition = getMapById(mapId);
@@ -98,15 +96,13 @@ export class MapViewer {
     }
     this.unloadMap();
 
-    const bundle =
-      options.loader !== undefined
-        ? DmapMapBundle.fromLoader(options.loader, options.baseUrl ?? definition.bundleUrl)
-        : await DmapMapBundle.open(definition.bundleUrl);
-    if (bundle.mapId !== mapId) {
-      throw new RangeError(`数据包地图 (${bundle.mapId}) 与请求地图 (${mapId}) 不一致`);
+    const pkg =
+      options.pkg !== undefined ? options.pkg : await openMapPackage(definition.bundleUrl);
+    if (pkg.mapId !== mapId) {
+      throw new RangeError(`数据包地图 (${pkg.mapId}) 与请求地图 (${mapId}) 不一致`);
     }
-    const sceneDoc = await readSceneDoc(bundle);
-    this.#bundle = bundle;
+    const sceneDoc = readSceneDoc(pkg);
+    this.#pkg = pkg;
     this.#sceneDoc = sceneDoc;
 
     // 相机限制取自场景包围盒（首包解密完成后才有）
@@ -129,7 +125,7 @@ export class MapViewer {
       dispose: () => {},
     });
 
-    const layer = new MapSceneLayer(bundle, sceneDoc, this.#floorManager);
+    const layer = new MapSceneLayer(pkg, sceneDoc, this.#floorManager);
     layer.attachCamera(this.#manager.camera);
     layer.setFocusProvider(() => this.#controls?.target ?? this.#manager.camera.position);
     if (options.onProgress) {
@@ -165,8 +161,8 @@ export class MapViewer {
     this.#mapCode = null;
     this.#controls?.dispose();
     this.#controls = null;
-    this.#bundle?.dispose();
-    this.#bundle = null;
+    this.#pkg?.dispose();
+    this.#pkg = null;
     this.#sceneDoc = null;
     this.#floorManager.clear();
   }
@@ -226,7 +222,7 @@ export class MapViewer {
     if (code === null) {
       return false;
     }
-    this.#navMeshPromise ??= openNavMesh(`/assets/${code}.nav.dmap`)
+    this.#navMeshPromise ??= openNavMesh(`/assets/${code}/nav.dmap`)
       .then((navMesh) => {
         this.#navMesh = navMesh;
         if (navMesh !== null && this.#navPathLayer === null) {

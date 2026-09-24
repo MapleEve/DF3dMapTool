@@ -1,13 +1,8 @@
-import {
-  type BufferGeometry,
-  InstancedMesh,
-  type Material,
-  type Object3D,
-} from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { DRACO_GLTF_CONFIG, DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
-import type { FloorBand } from './floorBands';
-import { floorForY } from './floorBands';
+import { type BufferGeometry, InstancedMesh, type Material, type Object3D } from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { DRACO_GLTF_CONFIG, DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
+import type { FloorBand } from "./floorBands";
+import { floorForY } from "./floorBands";
 
 /**
  * chunk GLB 解析器：GLTFLoader + Draco 解码器。
@@ -34,15 +29,13 @@ export class ChunkGltfParser {
     return new Promise<Object3D>((resolve, reject) => {
       this.#gltfLoader.parse(
         arrayBuffer,
-        '',
+        "",
         (gltf) => {
           resolve(gltf.scene);
         },
         (error) => {
           reject(
-            new Error(
-              `GLB 解析失败: ${error instanceof Error ? error.message : String(error)}`,
-            ),
+            new Error(`GLB 解析失败: ${error instanceof Error ? error.message : String(error)}`),
           );
         },
       );

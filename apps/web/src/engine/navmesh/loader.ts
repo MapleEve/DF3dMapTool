@@ -1,8 +1,8 @@
-import { openMapBundle } from '../assets';
-import { navMeshFromDoc, type NavMesh, type NavmeshDoc } from './navmesh';
+import { openMapBundle } from "../assets";
+import { navMeshFromDoc, type NavMesh, type NavmeshDoc } from "./navmesh";
 
 /** 加密导航容器内的数据条目名。 */
-export const NAVMESH_ENTRY = 'navmesh.json';
+export const NAVMESH_ENTRY = "navmesh.json";
 
 /**
  * 打开一张地图的加密导航数据容器并解析为可寻路 NavMesh。

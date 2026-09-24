@@ -1,6 +1,6 @@
-import { useTranslation } from 'react-i18next';
-import type { Vec3 } from '@/common/geometry';
-import { useNavStore } from '@/state/navStore';
+import { useTranslation } from "react-i18next";
+import type { Vec3 } from "@/common/geometry";
+import { useNavStore } from "@/state/navStore";
 
 /** 路径小视图尺寸（px），北朝上，世界 XZ 等比缩放。 */
 const VIEW_SIZE = 120;
@@ -17,32 +17,28 @@ export function NavPathHud() {
   const distance = useNavStore((state) => state.distance);
   const clear = useNavStore((state) => state.clear);
 
-  if (status === 'idle') {
+  if (status === "idle") {
     return null;
   }
 
   return (
     <aside className="nav-path-hud" role="status">
       <header className="nav-path-hud-header">
-        <strong>{t('nav.title')}</strong>
-        <button type="button" onClick={clear} aria-label={t('nav.close')}>
+        <strong>{t("nav.title")}</strong>
+        <button type="button" onClick={clear} aria-label={t("nav.close")}>
           ×
         </button>
       </header>
-      {status === 'loading' ? <p>{t('nav.loading')}</p> : null}
-      {status === 'unavailable' ? <p>{t('nav.unavailable')}</p> : null}
-      {status === 'unreachable' ? (
-        <p>
-          {t('nav.unreachable', { target: targetLabel ?? '' })}
-        </p>
+      {status === "loading" ? <p>{t("nav.loading")}</p> : null}
+      {status === "unavailable" ? <p>{t("nav.unavailable")}</p> : null}
+      {status === "unreachable" ? (
+        <p>{t("nav.unreachable", { target: targetLabel ?? "" })}</p>
       ) : null}
-      {status === 'ready' && path !== null && distance !== null ? (
+      {status === "ready" && path !== null && distance !== null ? (
         <>
-          <p className="nav-path-hud-target">
-            {t('nav.toTarget', { target: targetLabel ?? '' })}
-          </p>
+          <p className="nav-path-hud-target">{t("nav.toTarget", { target: targetLabel ?? "" })}</p>
           <p className="nav-path-hud-distance">
-            {t('nav.distance', { distance: Math.round(distance) })}
+            {t("nav.distance", { distance: Math.round(distance) })}
           </p>
           <MiniPathView path={path} />
         </>
@@ -71,8 +67,11 @@ function MiniPathView({ path }: { path: readonly Vec3[] }) {
   const cx = (minX + maxX) / 2;
   const cz = (minZ + maxZ) / 2;
   const points = path
-    .map((p) => `${((p.x - cx) * scale + VIEW_SIZE / 2).toFixed(1)},${((p.z - cz) * scale + VIEW_SIZE / 2).toFixed(1)}`)
-    .join(' ');
+    .map(
+      (p) =>
+        `${((p.x - cx) * scale + VIEW_SIZE / 2).toFixed(1)},${((p.z - cz) * scale + VIEW_SIZE / 2).toFixed(1)}`,
+    )
+    .join(" ");
   const last = path[path.length - 1];
   return (
     <svg
@@ -82,7 +81,13 @@ function MiniPathView({ path }: { path: readonly Vec3[] }) {
       viewBox={`0 0 ${VIEW_SIZE} ${VIEW_SIZE}`}
       aria-hidden
     >
-      <polyline points={points} fill="none" stroke="#36d399" strokeWidth={2} strokeLinejoin="round" />
+      <polyline
+        points={points}
+        fill="none"
+        stroke="#36d399"
+        strokeWidth={2}
+        strokeLinejoin="round"
+      />
       <circle
         cx={(path[0].x - cx) * scale + VIEW_SIZE / 2}
         cy={(path[0].z - cz) * scale + VIEW_SIZE / 2}

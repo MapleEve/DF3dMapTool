@@ -1,5 +1,5 @@
-import { useFloorStore } from '@/state/floorStore';
-import type { FloorManager } from './floorManager';
+import { useFloorStore } from "@/state/floorStore";
+import type { FloorManager } from "./floorManager";
 
 /**
  * 楼层状态对接：以楼层 store 为唯一事实来源，单向驱动 FloorManager。

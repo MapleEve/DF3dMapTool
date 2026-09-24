@@ -1,4 +1,4 @@
-import type { PoiSearchable } from './types';
+import type { PoiSearchable } from "./types";
 
 export interface RankedMatch<T> {
   readonly item: T;
@@ -7,7 +7,7 @@ export interface RankedMatch<T> {
 
 /** 归一化检索文本：NFKC 折叠 + 去首尾空白 + 小写。 */
 export function normalizeSearchText(text: string): string {
-  return text.normalize('NFKC').trim().toLowerCase();
+  return text.normalize("NFKC").trim().toLowerCase();
 }
 
 const SCORE_EXACT = 100;
@@ -43,7 +43,7 @@ export function searchPois<T extends PoiSearchable>(
 }
 
 function haystackOf(item: PoiSearchable): string {
-  return normalizeSearchText([item.displayName, ...(item.keywords ?? [])].join(' '));
+  return normalizeSearchText([item.displayName, ...(item.keywords ?? [])].join(" "));
 }
 
 function scoreOf(item: PoiSearchable, query: string, tokens: readonly string[]): number {

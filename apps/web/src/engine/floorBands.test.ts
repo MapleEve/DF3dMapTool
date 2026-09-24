@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { deriveFloorBands, floorForY } from './floorBands';
+import { describe, expect, it } from "vitest";
+import { deriveFloorBands, floorForY } from "./floorBands";
 
 /** az3 实测触发体（scene.json 提取，Y 为关键量）。 */
 const AZ3_TRIGGERS: readonly {
@@ -16,8 +16,8 @@ const AZ3_TRIGGERS: readonly {
   { floor: 1, boundsCenter: [-2046.377, -2.007, -2171.575], boundsExtent: [69.375, 13.5, 69.375] },
 ];
 
-describe('楼层分带', () => {
-  it('az3 三层按触发体中心高度分带，边界取相邻均值中点', () => {
+describe("楼层分带", () => {
+  it("az3 三层按触发体中心高度分带，边界取相邻均值中点", () => {
     const bands = deriveFloorBands([1, 2, 3], AZ3_TRIGGERS);
     expect(bands.map((band) => band.floor)).toEqual([1, 2, 3]);
     // 触发体中心均值：floor1 ≈ 1.2567、floor2 ≈ 14.48、floor3 = 36.535
@@ -30,7 +30,7 @@ describe('楼层分带', () => {
     expect(f3.yMax).toBe(Number.POSITIVE_INFINITY);
   });
 
-  it('floorForY：带内归属、边界归上层、越界归最近带', () => {
+  it("floorForY：带内归属、边界归上层、越界归最近带", () => {
     const bands = deriveFloorBands([1, 2, 3], AZ3_TRIGGERS);
     const boundary = bands[0].yMax;
     expect(floorForY(bands, -78)).toBe(1);
@@ -41,21 +41,21 @@ describe('楼层分带', () => {
     expect(floorForY(bands, 203.294)).toBe(3);
   });
 
-  it('无触发体时退化为单一分带（单层地图）', () => {
+  it("无触发体时退化为单一分带（单层地图）", () => {
     const bands = deriveFloorBands([1], []);
     expect(bands).toHaveLength(1);
     expect(bands[0].floor).toBe(1);
     expect(floorForY(bands, 12345)).toBe(1);
   });
 
-  it('多楼层但全部缺触发体：退化为首层单一分带，保证对象可见', () => {
+  it("多楼层但全部缺触发体：退化为首层单一分带，保证对象可见", () => {
     const bands = deriveFloorBands([1, 2, 3], []);
     expect(bands).toHaveLength(1);
     expect(bands[0].floor).toBe(1);
     expect(floorForY(bands, 60)).toBe(1);
   });
 
-  it('缺失中间楼层触发体时按相邻已知楼层插值补齐', () => {
+  it("缺失中间楼层触发体时按相邻已知楼层插值补齐", () => {
     const triggers: readonly {
       floor: number;
       boundsCenter: readonly [number, number, number];
@@ -74,15 +74,12 @@ describe('楼层分带', () => {
     expect(bands[1].yMax).toBeCloseTo(bands[2].yMin, 5);
   });
 
-  it('未知楼层触发体被忽略', () => {
+  it("未知楼层触发体被忽略", () => {
     const triggers: readonly {
       floor: number;
       boundsCenter: readonly [number, number, number];
       boundsExtent: readonly [number, number, number];
-    }[] = [
-      ...AZ3_TRIGGERS,
-      { floor: 99, boundsCenter: [0, -1000, 0], boundsExtent: [1, 1, 1] },
-    ];
+    }[] = [...AZ3_TRIGGERS, { floor: 99, boundsCenter: [0, -1000, 0], boundsExtent: [1, 1, 1] }];
     const bands = deriveFloorBands([1, 2, 3], triggers);
     expect(bands).toHaveLength(3);
     expect(bands[0].floor).toBe(1);

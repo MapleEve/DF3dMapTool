@@ -1,5 +1,5 @@
-import { create } from 'zustand';
-import { POI_CATEGORY_IDS, type PoiCategoryId } from '@/poi';
+import { create } from "zustand";
+import { POI_CATEGORY_IDS, type PoiCategoryId } from "@/poi";
 
 interface PoiFilterStoreState {
   /** 被隐藏的分类；不在其中即显示。 */

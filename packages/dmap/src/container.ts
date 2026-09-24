@@ -1,5 +1,5 @@
-import { toCryptoBytes } from './bytes.js';
-import { DmapFormatError, DmapIntegrityError } from './errors.js';
+import { toCryptoBytes } from "./bytes.js";
+import { DmapFormatError, DmapIntegrityError } from "./errors.js";
 
 /** 容器 magic，ASCII "DMAP"。 */
 export const MAGIC_BYTES: readonly number[] = [0x44, 0x4d, 0x41, 0x50];
@@ -30,7 +30,7 @@ function isMagic(bytes: Uint8Array): boolean {
 /** 序列化 24 字节容器头。 */
 export function encodeHeader(header: DmapHeader): Uint8Array {
   if (header.iv.length !== IV_BYTES) {
-    throw new DmapFormatError('bad_header', `IV 必须为 ${IV_BYTES} 字节`);
+    throw new DmapFormatError("bad_header", `IV 必须为 ${IV_BYTES} 字节`);
   }
   const bytes = new Uint8Array(HEADER_BYTES);
   bytes.set(MAGIC_BYTES, 0);
@@ -45,18 +45,18 @@ export function encodeHeader(header: DmapHeader): Uint8Array {
 export function decodeHeader(bytes: Uint8Array): DmapHeader {
   if (bytes.length < HEADER_BYTES) {
     throw new DmapFormatError(
-      'truncated',
+      "truncated",
       `容器头部不完整：期望至少 ${HEADER_BYTES} 字节，实际 ${bytes.length} 字节`,
     );
   }
   if (!isMagic(bytes)) {
-    throw new DmapFormatError('bad_header', '容器 magic 不正确，不是 DMAP 文件');
+    throw new DmapFormatError("bad_header", "容器 magic 不正确，不是 DMAP 文件");
   }
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const version = view.getUint32(4, true);
   if (version !== FORMAT_VERSION) {
     throw new DmapFormatError(
-      'unsupported_version',
+      "unsupported_version",
       `不支持的容器版本: ${version}（当前支持 ${FORMAT_VERSION}）`,
     );
   }
@@ -76,7 +76,7 @@ export async function sealPayload(
   aad: Uint8Array,
 ): Promise<Uint8Array> {
   const sealed = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv: toCryptoBytes(iv), additionalData: toCryptoBytes(aad), tagLength: 128 },
+    { name: "AES-GCM", iv: toCryptoBytes(iv), additionalData: toCryptoBytes(aad), tagLength: 128 },
     key,
     toCryptoBytes(payload),
   );
@@ -94,7 +94,7 @@ export async function unsealPayload(
   try {
     plain = await crypto.subtle.decrypt(
       {
-        name: 'AES-GCM',
+        name: "AES-GCM",
         iv: toCryptoBytes(iv),
         additionalData: toCryptoBytes(aad),
         tagLength: 128,
@@ -103,7 +103,7 @@ export async function unsealPayload(
       toCryptoBytes(sealed),
     );
   } catch {
-    throw new DmapIntegrityError('载荷完整性校验失败：数据被篡改或密钥不匹配');
+    throw new DmapIntegrityError("载荷完整性校验失败：数据被篡改或密钥不匹配");
   }
   return new Uint8Array(plain);
 }

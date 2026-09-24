@@ -7,9 +7,9 @@ import {
   Mesh,
   MeshBasicMaterial,
   SphereGeometry,
-} from 'three';
-import type { EngineLayer } from '../SceneManager';
-import type { Vec3 } from '@/common/geometry';
+} from "three";
+import type { EngineLayer } from "../SceneManager";
+import type { Vec3 } from "@/common/geometry";
 
 /** 路径线上抬高度，避免与地面 z-fighting。 */
 const PATH_Y_OFFSET = 0.35;
@@ -23,7 +23,7 @@ const GOAL_COLOR = 0xffc65c;
  * setPath(null) 清空显示；图层本身随 SceneManager 生命周期管理。
  */
 export class NavPathLayer implements EngineLayer {
-  readonly id = 'nav-path';
+  readonly id = "nav-path";
   readonly root = new Group();
 
   readonly #line: Line<BufferGeometry, LineBasicMaterial>;
@@ -65,7 +65,7 @@ export class NavPathLayer implements EngineLayer {
       positions[i * 3 + 2] = p.z;
     });
     const geometry = new BufferGeometry();
-    geometry.setAttribute('position', new BufferAttribute(positions, 3));
+    geometry.setAttribute("position", new BufferAttribute(positions, 3));
     this.#line.geometry.dispose();
     this.#line.geometry = geometry;
     this.#line.visible = true;

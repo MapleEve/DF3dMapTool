@@ -1,16 +1,16 @@
-import type { ChangeEvent } from 'react';
-import { useMemo } from 'react';
-import { useTranslation } from 'react-i18next';
-import { POI_CATEGORIES } from '@/poi';
-import type { PoiCategory, PoiDefinition } from '@/poi/types';
-import { searchPois } from '@/poi/search';
-import { useFloorStore } from '@/state/floorStore';
-import { useMapDataStore } from '@/state/mapDataStore';
-import { useMapStore } from '@/state/mapStore';
-import { usePoiFilterStore } from '@/state/poiFilterStore';
-import { usePoiStore } from '@/state/poiStore';
-import { useSearchStore } from '@/state/searchStore';
-import { useUiStore } from '@/state/uiStore';
+import type { ChangeEvent } from "react";
+import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
+import { POI_CATEGORIES } from "@/poi";
+import type { PoiCategory, PoiDefinition } from "@/poi/types";
+import { searchPois } from "@/poi/search";
+import { useFloorStore } from "@/state/floorStore";
+import { useMapDataStore } from "@/state/mapDataStore";
+import { useMapStore } from "@/state/mapStore";
+import { usePoiFilterStore } from "@/state/poiFilterStore";
+import { usePoiStore } from "@/state/poiStore";
+import { useSearchStore } from "@/state/searchStore";
+import { useUiStore } from "@/state/uiStore";
 
 /**
  * 左侧栏：POI 检索（名称/关键字 + 飞入定位）、分类筛选、楼层联动结果列表。
@@ -33,7 +33,8 @@ export function Sidebar() {
   const requestFlyTo = usePoiStore((state) => state.requestFlyTo);
   const selectedPoiId = usePoiStore((state) => state.selectedPoiId);
 
-  const categories = poiData !== null && poiData.categories.length > 0 ? poiData.categories : POI_CATEGORIES;
+  const categories =
+    poiData !== null && poiData.categories.length > 0 ? poiData.categories : POI_CATEGORIES;
 
   const results = useMemo(() => {
     if (poiData === null) {
@@ -61,30 +62,34 @@ export function Sidebar() {
 
   return (
     <aside className="sidebar">
-      <h2 className="sidebar-title">{t('sidebar.title')}</h2>
+      <h2 className="sidebar-title">{t("sidebar.title")}</h2>
 
       <div className="sidebar-search">
         <input
           type="search"
           value={query}
           onChange={handleSearchChange}
-          placeholder={t('sidebar.searchPlaceholder')}
-          aria-label={t('sidebar.searchPlaceholder')}
+          placeholder={t("sidebar.searchPlaceholder")}
+          aria-label={t("sidebar.searchPlaceholder")}
         />
         <button type="button" onClick={clearQuery} disabled={query.length === 0}>
-          {t('sidebar.clearSearch')}
+          {t("sidebar.clearSearch")}
         </button>
       </div>
 
       {query.length > 0 ? (
-        <section className="sidebar-results" aria-label={t('sidebar.searchPlaceholder')}>
-          <p className="sidebar-result-count">{t('sidebar.resultCount', { count: results.length })}</p>
+        <section className="sidebar-results" aria-label={t("sidebar.searchPlaceholder")}>
+          <p className="sidebar-result-count">
+            {t("sidebar.resultCount", { count: results.length })}
+          </p>
           <ul>
             {results.map(({ poi, category }) => (
               <li key={poi.id}>
                 <button
                   type="button"
-                  className={poi.id === selectedPoiId ? 'sidebar-result selected' : 'sidebar-result'}
+                  className={
+                    poi.id === selectedPoiId ? "sidebar-result selected" : "sidebar-result"
+                  }
                   onClick={() => handleResultClick(poi)}
                 >
                   <span
@@ -94,15 +99,15 @@ export function Sidebar() {
                   <span className="sidebar-result-name">{poi.displayName}</span>
                   <span className="sidebar-result-floor">
                     {poi.floor === 0
-                      ? t('poi.allFloors')
-                      : t('floor.floorName', { floor: poi.floor })}
+                      ? t("poi.allFloors")
+                      : t("floor.floorName", { floor: poi.floor })}
                   </span>
                 </button>
               </li>
             ))}
             {results.length === 0 ? (
               <li className="sidebar-result-empty">
-                {status === 'ready' ? t('sidebar.emptyWhenReady') : t('sidebar.needMapData')}
+                {status === "ready" ? t("sidebar.emptyWhenReady") : t("sidebar.needMapData")}
               </li>
             ) : null}
           </ul>
@@ -110,13 +115,13 @@ export function Sidebar() {
       ) : null}
 
       <section className="sidebar-categories">
-        <h3>{t('sidebar.categories')}</h3>
+        <h3>{t("sidebar.categories")}</h3>
         <div className="sidebar-category-actions">
           <button type="button" onClick={showAllCategories}>
-            {t('sidebar.showAll')}
+            {t("sidebar.showAll")}
           </button>
           <button type="button" onClick={hideAllCategories}>
-            {t('sidebar.hideAll')}
+            {t("sidebar.hideAll")}
           </button>
         </div>
         <ul>
@@ -125,7 +130,7 @@ export function Sidebar() {
             // 数据包派生分类的 labelKey 不在静态 i18n 键表内，按字符串查表并回退 label。
             const label =
               category.labelKey !== undefined
-                ? t(category.labelKey as never, { defaultValue: category.label ?? '' })
+                ? t(category.labelKey as never, { defaultValue: category.label ?? "" })
                 : (category.label ?? category.id);
             return (
               <li key={category.id}>
@@ -148,9 +153,14 @@ export function Sidebar() {
       </section>
 
       <p className="sidebar-hint">
-        {status === 'ready'
-          ? t('sidebar.hintFloor', { floor: floor < 0 ? t('floor.basement', { floor: Math.abs(floor) }) : t('floor.floorName', { floor }) })
-          : t('sidebar.needMapData')}
+        {status === "ready"
+          ? t("sidebar.hintFloor", {
+              floor:
+                floor < 0
+                  ? t("floor.basement", { floor: Math.abs(floor) })
+                  : t("floor.floorName", { floor }),
+            })
+          : t("sidebar.needMapData")}
       </p>
     </aside>
   );

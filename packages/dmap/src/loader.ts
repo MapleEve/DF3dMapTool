@@ -1,7 +1,7 @@
-import { readEntryData, unpackBundle, type DmapcIndexEntry } from './bundle.js';
-import { decodeHeader, HEADER_BYTES, TAG_BYTES, unsealPayload } from './container.js';
-import { DmapFormatError } from './errors.js';
-import { resolveAesKey, type DmapKeySource } from './key.js';
+import { readEntryData, unpackBundle, type DmapcIndexEntry } from "./bundle.js";
+import { decodeHeader, HEADER_BYTES, TAG_BYTES, unsealPayload } from "./container.js";
+import { DmapFormatError } from "./errors.js";
+import { resolveAesKey, type DmapKeySource } from "./key.js";
 
 export interface DmapEntryInfo {
   readonly name: string;
@@ -45,7 +45,7 @@ export class DmapLoader {
   static async open(bytes: Uint8Array, keySource: DmapKeySource): Promise<DmapLoader> {
     if (bytes.length < HEADER_BYTES + TAG_BYTES) {
       throw new DmapFormatError(
-        'truncated',
+        "truncated",
         `容器过短：至少 ${HEADER_BYTES + TAG_BYTES} 字节，实际 ${bytes.length} 字节`,
       );
     }

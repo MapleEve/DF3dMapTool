@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
-import { PerspectiveCamera } from 'three';
-import { MapCameraControls } from './cameraControls';
+import { describe, expect, it } from "vitest";
+import { PerspectiveCamera } from "three";
+import { MapCameraControls } from "./cameraControls";
 
 const BOUNDS = {
   min: { x: -100, y: 0, z: -100 },
@@ -15,15 +15,15 @@ function createControls(): MapCameraControls {
   });
 }
 
-describe('MapCameraControls', () => {
-  it('构造时基类内联调用 update() 不因子类私有字段未初始化而抛错', () => {
+describe("MapCameraControls", () => {
+  it("构造时基类内联调用 update() 不因子类私有字段未初始化而抛错", () => {
     // 回归：OrbitControls 基类构造函数末尾调用 this.update()，此时
     // MapCameraControls 的私有字段尚未初始化，覆写内直接读会抛
     // "Cannot read private member ..."（真机浏览器首载曾命中）。
     expect(() => createControls()).not.toThrow();
   });
 
-  it('构造后 update 持续可用且注视点被钳制在场景范围内', () => {
+  it("构造后 update 持续可用且注视点被钳制在场景范围内", () => {
     const controls = createControls();
     controls.target.set(9999, -50, -9999);
     controls.update(1 / 60);
@@ -32,7 +32,7 @@ describe('MapCameraControls', () => {
     expect(controls.target.z).toBeGreaterThanOrEqual(BOUNDS.min.z);
   });
 
-  it('flyTo 缓动推进到目标后 promise 以完成收尾', async () => {
+  it("flyTo 缓动推进到目标后 promise 以完成收尾", async () => {
     const controls = createControls();
     controls.frameBounds(BOUNDS);
     const target = { x: 10, y: 5, z: 20 };
@@ -46,7 +46,7 @@ describe('MapCameraControls', () => {
     expect(controls.target.z).toBeCloseTo(target.z, 1);
   });
 
-  it('用户输入中断缓动：promise 以未完成收尾', async () => {
+  it("用户输入中断缓动：promise 以未完成收尾", async () => {
     const controls = createControls();
     controls.frameBounds(BOUNDS);
     const finished = controls.flyTo({ x: 10, y: 5, z: 20 });

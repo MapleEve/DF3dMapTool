@@ -1,4 +1,4 @@
-import type { MapCode, MapDefinition, MapId } from './types';
+import type { MapCode, MapDefinition, MapId } from "./types";
 
 /**
  * 可切换地图注册表：MapId ↔ 资产代号 ↔ 显示名键。
@@ -7,52 +7,52 @@ import type { MapCode, MapDefinition, MapId } from './types';
 export const MAPS: readonly MapDefinition[] = [
   {
     id: 101,
-    code: 'damiris',
-    nameKey: 'maps.damiris',
+    code: "damiris",
+    nameKey: "maps.damiris",
     knownFloors: [-1, 1, 2],
     defaultFloor: 1,
-    bundleUrl: '/assets/damiris.dmap',
+    bundleUrl: "/assets/damiris/index.dmap",
   },
   {
     id: 102,
-    code: 'forrest',
-    nameKey: 'maps.forrest',
+    code: "forrest",
+    nameKey: "maps.forrest",
     knownFloors: [1],
     defaultFloor: 1,
-    bundleUrl: '/assets/forrest.dmap',
+    bundleUrl: "/assets/forrest/index.dmap",
   },
   {
     id: 104,
-    code: 'brakkesh',
-    nameKey: 'maps.brakkesh',
+    code: "brakkesh",
+    nameKey: "maps.brakkesh",
     knownFloors: [1],
     defaultFloor: 1,
-    bundleUrl: '/assets/brakkesh.dmap',
+    bundleUrl: "/assets/brakkesh/index.dmap",
   },
   {
     id: 105,
-    code: 'tideprison',
-    nameKey: 'maps.tideprison',
+    code: "tideprison",
+    nameKey: "maps.tideprison",
     knownFloors: [1, 2, 3, 4],
     defaultFloor: 1,
-    bundleUrl: '/assets/tideprison.dmap',
+    bundleUrl: "/assets/tideprison/index.dmap",
   },
   {
     id: 106,
-    code: 'az3',
-    nameKey: 'maps.az3',
+    code: "az3",
+    nameKey: "maps.az3",
     knownFloors: [1, 2, 3],
     defaultFloor: 1,
-    bundleUrl: '/assets/az3.dmap',
+    bundleUrl: "/assets/az3/index.dmap",
     knownPlacementCount: 45595,
   },
   {
     id: 203,
-    code: 'spacecenter',
-    nameKey: 'maps.spacecenter',
+    code: "spacecenter",
+    nameKey: "maps.spacecenter",
     knownFloors: [1, 2],
     defaultFloor: 1,
-    bundleUrl: '/assets/spacecenter.dmap',
+    bundleUrl: "/assets/spacecenter/index.dmap",
   },
 ];
 

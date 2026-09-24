@@ -1,5 +1,5 @@
-import { toCryptoBytes } from './bytes.js';
-import { DmapKeyError } from './errors.js';
+import { toCryptoBytes } from "./bytes.js";
+import { DmapKeyError } from "./errors.js";
 
 /** 密钥材料段数。 */
 export const SEGMENT_COUNT = 4;
@@ -21,7 +21,7 @@ export interface DmapKeyMaterial {
 export type DmapKeySource = DmapKeyMaterial | CryptoKey;
 
 export function isDmapKeyMaterial(value: unknown): value is DmapKeyMaterial {
-  if (typeof value !== 'object' || value === null) {
+  if (typeof value !== "object" || value === null) {
     return false;
   }
   const candidate = value as Partial<DmapKeyMaterial>;
@@ -67,8 +67,8 @@ export function deriveRawKeyBytes(material: DmapKeyMaterial): Uint8Array {
  * 返回的 CryptoKey 不可导出（extractable=false），只能用于 AES-GCM 加解封。
  */
 export async function deriveKey(material: DmapKeyMaterial): Promise<CryptoKey> {
-  const raw = await crypto.subtle.digest('SHA-256', toCryptoBytes(deriveRawKeyBytes(material)));
-  return crypto.subtle.importKey('raw', raw, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+  const raw = await crypto.subtle.digest("SHA-256", toCryptoBytes(deriveRawKeyBytes(material)));
+  return crypto.subtle.importKey("raw", raw, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
 }
 
 /** 归一化密钥来源：材料则现场派生，CryptoKey 则直接使用。 */

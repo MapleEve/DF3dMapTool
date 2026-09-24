@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
-import { PerspectiveCamera } from 'three';
-import { projectManyToScreen, projectToScreen } from './poiProjector';
+import { describe, expect, it } from "vitest";
+import { PerspectiveCamera } from "three";
+import { projectManyToScreen, projectToScreen } from "./poiProjector";
 
 const WIDTH = 800;
 const HEIGHT = 600;
@@ -13,8 +13,8 @@ function makeCamera(position: [number, number, number], lookAt: [number, number,
   return camera;
 }
 
-describe('POI 屏幕投影', () => {
-  it('视线正前方点投影到画布中心，距离为视距', () => {
+describe("POI 屏幕投影", () => {
+  it("视线正前方点投影到画布中心，距离为视距", () => {
     const camera = makeCamera([0, 0, 0], [0, 0, -1]);
     const anchor = projectToScreen(camera, { x: 0, y: 0, z: -10 }, WIDTH, HEIGHT);
     expect(anchor.x).toBeCloseTo(WIDTH / 2, 5);
@@ -23,14 +23,14 @@ describe('POI 屏幕投影', () => {
     expect(anchor.distance).toBeCloseTo(10, 5);
   });
 
-  it('相机后方点不可见（镜像坐标被抑制）', () => {
+  it("相机后方点不可见（镜像坐标被抑制）", () => {
     const camera = makeCamera([0, 0, 0], [0, 0, -1]);
     const anchor = projectToScreen(camera, { x: 0, y: 0, z: 10 }, WIDTH, HEIGHT);
     expect(anchor.visible).toBe(false);
     expect(anchor.distance).toBeCloseTo(-10, 5);
   });
 
-  it('视口内偏移点按像素映射；视口外标记不可见但坐标仍输出', () => {
+  it("视口内偏移点按像素映射；视口外标记不可见但坐标仍输出", () => {
     const camera = makeCamera([0, 0, 0], [0, 0, -1]);
     // 右移 5m、上移 5m，10m 视距：NDC x = 5/(10*tan(35°)*aspect), y = 5/(10*tan(35°))
     const anchor = projectToScreen(camera, { x: 5, y: 5, z: -10 }, WIDTH, HEIGHT);
@@ -45,14 +45,14 @@ describe('POI 屏幕投影', () => {
     expect(farOff.visible).toBe(false);
   });
 
-  it('世界坐标镜像一致性：Z 取反后投影左右镜像', () => {
+  it("世界坐标镜像一致性：Z 取反后投影左右镜像", () => {
     const camera = makeCamera([0, 0, 0], [0, 0, -1]);
     const left = projectToScreen(camera, { x: -5, y: 0, z: -10 }, WIDTH, HEIGHT);
     const right = projectToScreen(camera, { x: 5, y: 0, z: -10 }, WIDTH, HEIGHT);
     expect(WIDTH - left.x).toBeCloseTo(right.x, 5);
   });
 
-  it('批量投影与单点结果一致', () => {
+  it("批量投影与单点结果一致", () => {
     const camera = makeCamera([100, 50, 200], [-1951, 62, -2076]);
     const worlds = [
       { x: -1951, y: 62, z: -2076 },

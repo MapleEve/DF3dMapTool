@@ -1,11 +1,8 @@
-import { useCallback, useEffect, useRef } from 'react';
-import type { PointerEvent as ReactPointerEvent, WheelEvent as ReactWheelEvent } from 'react';
-import {
-  pipelinePixelToWorld,
-  pipelineWorldToUv,
-} from './project';
-import { MAX_ZOOM_INDEX, MIN_ZOOM_INDEX, nextStepIndex, ZOOM_STEPS } from './zoomSteps';
-import type { BigmapCalibration, WorldXZ } from './types';
+import { useCallback, useEffect, useRef } from "react";
+import type { PointerEvent as ReactPointerEvent } from "react";
+import { pipelinePixelToWorld, pipelineWorldToUv } from "./project";
+import { MAX_ZOOM_INDEX, MIN_ZOOM_INDEX, nextStepIndex, ZOOM_STEPS } from "./zoomSteps";
+import type { BigmapCalibration, WorldXZ } from "./types";
 
 /** 2D 底图上的 POI 标记（图标位图由父层解析后传入）。 */
 export interface BigmapPoiMarker {
@@ -123,7 +120,7 @@ export function BigmapCanvas(props: BigmapCanvasProps) {
     if (canvas === null) {
       return;
     }
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext("2d");
     if (ctx === null) {
       return;
     }
@@ -139,7 +136,7 @@ export function BigmapCanvas(props: BigmapCanvasProps) {
       canvas.height = pixelHeight;
     }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.fillStyle = '#080c11';
+    ctx.fillStyle = "#080c11";
     ctx.fillRect(0, 0, width, height);
 
     const image = imageRef.current;
@@ -162,8 +159,8 @@ export function BigmapCanvas(props: BigmapCanvasProps) {
     ctx.drawImage(image, view.offsetX, view.offsetY, drawW, drawH);
 
     // 区域名标注层：屏幕空间描边文字，字号不随缩放变化；选中区域高亮。
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
     regionHitsRef.current = [];
     for (const region of regions) {
       const point = toScreen(region.world);
@@ -175,14 +172,14 @@ export function BigmapCanvas(props: BigmapCanvasProps) {
         ? '700 14px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif'
         : '600 13px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif';
       ctx.lineWidth = 3;
-      ctx.strokeStyle = 'rgba(5, 8, 12, 0.85)';
+      ctx.strokeStyle = "rgba(5, 8, 12, 0.85)";
       ctx.strokeText(region.name, point.x, point.y);
-      ctx.fillStyle = selected ? '#5aa9ff' : 'rgba(219, 231, 243, 0.92)';
+      ctx.fillStyle = selected ? "#5aa9ff" : "rgba(219, 231, 243, 0.92)";
       ctx.fillText(region.name, point.x, point.y);
       if (selected) {
         ctx.beginPath();
         ctx.arc(point.x, point.y, 7, 0, Math.PI * 2);
-        ctx.strokeStyle = '#5aa9ff';
+        ctx.strokeStyle = "#5aa9ff";
         ctx.lineWidth = 1.5;
         ctx.stroke();
       }
@@ -195,17 +192,12 @@ export function BigmapCanvas(props: BigmapCanvasProps) {
       const point = toScreen(poi.world);
       const size = poi.selected === true ? POI_DRAW_SIZE + 8 : POI_DRAW_SIZE;
       const half = size / 2;
-      if (
-        point.x < -size ||
-        point.x > width + size ||
-        point.y < -size ||
-        point.y > height + size
-      ) {
+      if (point.x < -size || point.x > width + size || point.y < -size || point.y > height + size) {
         continue;
       }
       ctx.beginPath();
       ctx.arc(point.x, point.y, half + 2, 0, Math.PI * 2);
-      ctx.fillStyle = poi.selected === true ? '#5aa9ff' : 'rgba(8, 12, 17, 0.72)';
+      ctx.fillStyle = poi.selected === true ? "#5aa9ff" : "rgba(8, 12, 17, 0.72)";
       ctx.fill();
       ctx.lineWidth = poi.selected === true ? 2 : 1;
       ctx.strokeStyle = poi.color;
@@ -238,8 +230,8 @@ export function BigmapCanvas(props: BigmapCanvasProps) {
       ctx.lineTo(0, 3.5);
       ctx.lineTo(-6.5, 7);
       ctx.closePath();
-      ctx.fillStyle = '#5aa9ff';
-      ctx.strokeStyle = 'rgba(5, 8, 12, 0.9)';
+      ctx.fillStyle = "#5aa9ff";
+      ctx.strokeStyle = "rgba(5, 8, 12, 0.9)";
       ctx.lineWidth = 1.5;
       ctx.fill();
       ctx.stroke();
@@ -251,28 +243,34 @@ export function BigmapCanvas(props: BigmapCanvasProps) {
       const point = toScreen(marker);
       ctx.beginPath();
       ctx.arc(point.x, point.y, 6, 0, Math.PI * 2);
-      ctx.fillStyle = '#ff6b6b';
+      ctx.fillStyle = "#ff6b6b";
       ctx.fill();
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.85)";
       ctx.lineWidth = 1.5;
       ctx.stroke();
       ctx.font = '11px "PingFang SC", system-ui, sans-serif';
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'alphabetic';
+      ctx.textAlign = "left";
+      ctx.textBaseline = "alphabetic";
       const label = `X ${marker.x.toFixed(1)}  Z ${marker.z.toFixed(1)}`;
       ctx.lineWidth = 3;
-      ctx.strokeStyle = 'rgba(5, 8, 12, 0.85)';
+      ctx.strokeStyle = "rgba(5, 8, 12, 0.85)";
       ctx.strokeText(label, point.x + 10, point.y - 8);
-      ctx.fillStyle = '#dbe7f3';
+      ctx.fillStyle = "#dbe7f3";
       ctx.fillText(label, point.x + 10, point.y - 8);
     }
   }, [calibration, imageSize, marker, playerXZ, playerYaw, pois, regions, selectedRegionId]);
 
   // 底图加载：换图/换层后复位视图（含缩放档位回调归零）。
+  // 依赖只有 imageUrl：draw 身份随覆盖层数据变化（图标解码/相机 HUD 等），
+  // 若把它列入依赖会让底图反复重解码并把用户缩放/平移瞬间复位（Batch2.5 修复）。
+  const drawRef = useRef(draw);
+  useEffect(() => {
+    drawRef.current = draw;
+  });
   useEffect(() => {
     if (imageUrl === null) {
       imageRef.current = null;
-      draw();
+      drawRef.current();
       return;
     }
     let cancelled = false;
@@ -287,18 +285,18 @@ export function BigmapCanvas(props: BigmapCanvasProps) {
         imageRef.current = image;
         viewRef.current = { zoom: 1, offsetX: 0, offsetY: 0 };
         onZoomChangeRef.current?.(MIN_ZOOM_INDEX);
-        draw();
+        drawRef.current();
       })
       .catch(() => {
         if (!cancelled) {
           imageRef.current = null;
-          draw();
+          drawRef.current();
         }
       });
     return () => {
       cancelled = true;
     };
-  }, [imageUrl, draw]);
+  }, [imageUrl]);
 
   // 画布尺寸自适应。
   useEffect(() => {
@@ -341,6 +339,8 @@ export function BigmapCanvas(props: BigmapCanvasProps) {
       view.offsetY = anchorYValue - (anchorYValue - view.offsetY) * effective;
       view.zoom = nextZoom;
       draw();
+      // 滑杆回显同步：按钮/滚轮驱动的档位变化同样上报（与滑杆/复位共用档位表）。
+      onZoomChangeRef.current?.(clamped);
     },
     [draw],
   );
@@ -475,12 +475,29 @@ export function BigmapCanvas(props: BigmapCanvasProps) {
     );
   };
 
-  const handleWheel = (event: ReactWheelEvent<HTMLCanvasElement>) => {
-    event.preventDefault();
-    const rect = event.currentTarget.getBoundingClientRect();
-    const direction = event.deltaY < 0 ? 1 : -1;
-    zoomToStep(nextStepIndex(viewRef.current.zoom, direction), event.clientX - rect.left, event.clientY - rect.top);
-  };
+  // 滚轮缩放：原生非被动监听（React 根委托的 wheel 为 passive，preventDefault 会失效并报错）。
+  const zoomToStepRef = useRef(zoomToStep);
+  useEffect(() => {
+    zoomToStepRef.current = zoomToStep;
+  });
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (canvas === null) {
+      return;
+    }
+    const handleWheelNative = (event: WheelEvent) => {
+      event.preventDefault();
+      const rect = canvas.getBoundingClientRect();
+      const direction = event.deltaY < 0 ? 1 : -1;
+      zoomToStepRef.current(
+        nextStepIndex(viewRef.current.zoom, direction),
+        event.clientX - rect.left,
+        event.clientY - rect.top,
+      );
+    };
+    canvas.addEventListener("wheel", handleWheelNative, { passive: false });
+    return () => canvas.removeEventListener("wheel", handleWheelNative);
+  }, []);
 
   const handleContextMenu = (event: React.MouseEvent<HTMLCanvasElement>) => {
     event.preventDefault();
@@ -509,7 +526,6 @@ export function BigmapCanvas(props: BigmapCanvasProps) {
       onPointerCancel={() => {
         dragRef.current = null;
       }}
-      onWheel={handleWheel}
       onContextMenu={handleContextMenu}
     />
   );

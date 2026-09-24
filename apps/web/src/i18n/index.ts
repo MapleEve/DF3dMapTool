@@ -1,21 +1,21 @@
-import i18next from 'i18next';
-import { initReactI18next } from 'react-i18next';
-import { en } from './en';
-import { zh } from './zh';
+import i18next from "i18next";
+import { initReactI18next } from "react-i18next";
+import { en } from "./en";
+import { zh } from "./zh";
 
-export const SUPPORTED_LANGUAGES = ['zh', 'en'] as const;
+export const SUPPORTED_LANGUAGES = ["zh", "en"] as const;
 export type Language = (typeof SUPPORTED_LANGUAGES)[number];
 /** 默认语言：中文。 */
-export const DEFAULT_LANGUAGE: Language = 'zh';
+export const DEFAULT_LANGUAGE: Language = "zh";
 /** 语言偏好的持久化键（uiStore.setLanguage 同步写入）。 */
-export const LANGUAGE_STORAGE_KEY = 'df3dmaptool:language';
+export const LANGUAGE_STORAGE_KEY = "df3dmaptool:language";
 
-export type { TranslationSchema } from './zh';
+export type { TranslationSchema } from "./zh";
 
 function readStoredLanguage(): Language {
   try {
     const stored = localStorage.getItem(LANGUAGE_STORAGE_KEY);
-    return stored === 'en' || stored === 'zh' ? stored : DEFAULT_LANGUAGE;
+    return stored === "en" || stored === "zh" ? stored : DEFAULT_LANGUAGE;
   } catch {
     return DEFAULT_LANGUAGE;
   }
@@ -29,7 +29,7 @@ export function initI18n(): Promise<void> {
     .use(initReactI18next)
     .init({
       lng: readStoredLanguage(),
-      fallbackLng: 'en',
+      fallbackLng: "en",
       resources: {
         zh: { translation: zh },
         en: { translation: en },

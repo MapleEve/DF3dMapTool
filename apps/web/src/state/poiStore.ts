@@ -1,5 +1,5 @@
-import { create } from 'zustand';
-import type { Vec3 } from '@/common/geometry';
+import { create } from "zustand";
+import type { Vec3 } from "@/common/geometry";
 
 /** 相机飞入请求：token 自增以触发同一目标的重复飞行。 */
 export interface FlyToTarget {

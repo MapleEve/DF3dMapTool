@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from "vitest";
 import {
   isInsideCalibration,
   pixelToWorld,
@@ -8,8 +8,8 @@ import {
   worldToPixel,
   worldToPixelClamped,
   worldToUv,
-} from './project';
-import type { BigmapCalibration } from './types';
+} from "./project";
+import type { BigmapCalibration } from "./types";
 
 /**
  * 真实标定样例（量级与字段取自内置数据包的 2D 楼层标定）：
@@ -36,8 +36,8 @@ const az3Calibration: BigmapCalibration = {
   imageHeightPx: 4096,
 };
 
-describe('2D 投影（源世界系口径）', () => {
-  it('包围盒角点映射到底图四角，Z 轴向下翻转（v=0 对应 worldMaxZ）', () => {
+describe("2D 投影（源世界系口径）", () => {
+  it("包围盒角点映射到底图四角，Z 轴向下翻转（v=0 对应 worldMaxZ）", () => {
     expect(worldToUv({ x: 3011.84, z: 8134.24 }, dbCalibration).u).toBeCloseTo(0, 9);
     expect(worldToUv({ x: 3011.84, z: 8134.24 }, dbCalibration).v).toBeCloseTo(0, 9);
     expect(worldToUv({ x: 4109.07, z: 7232.96 }, dbCalibration).u).toBeCloseTo(1, 9);
@@ -50,13 +50,13 @@ describe('2D 投影（源世界系口径）', () => {
     expect(bottomRight.y).toBeCloseTo(4096, 6);
   });
 
-  it('真实样例值：行政辖区 (3645.988, 7877.95) → 像素 (≈2367.3, ≈1165.1)', () => {
+  it("真实样例值：行政辖区 (3645.988, 7877.95) → 像素 (≈2367.3, ≈1165.1)", () => {
     const pixel = worldToPixel({ x: 3645.988, z: 7877.95 }, dbCalibration);
     expect(pixel.x).toBeCloseTo(2367.3, 0);
     expect(pixel.y).toBeCloseTo(1165.1, 0);
   });
 
-  it('world → pixel → world 往返还原', () => {
+  it("world → pixel → world 往返还原", () => {
     const world = { x: 3645.988, z: 7877.95 };
     const pixel = worldToPixel(world, dbCalibration);
     const back = pixelToWorld(pixel, dbCalibration);
@@ -64,13 +64,13 @@ describe('2D 投影（源世界系口径）', () => {
     expect(back.z).toBeCloseTo(world.z, 6);
   });
 
-  it('区域显示坐标 = 世界 ×100、Z 取负', () => {
+  it("区域显示坐标 = 世界 ×100、Z 取负", () => {
     const display = toRegionDisplayCoords({ x: 3789.162, z: 4597.274 });
     expect(display.x).toBeCloseTo(378916.2, 6);
     expect(display.y).toBeCloseTo(-459727.4, 6);
   });
 
-  it('越界判定与夹取投影', () => {
+  it("越界判定与夹取投影", () => {
     expect(isInsideCalibration({ x: 3011.84, z: 0 }, dbCalibration)).toBe(false);
     expect(isInsideCalibration({ x: 3500, z: 8000 }, dbCalibration)).toBe(true);
     const clamped = worldToPixelClamped({ x: 0, z: 9000 }, dbCalibration);
@@ -79,23 +79,17 @@ describe('2D 投影（源世界系口径）', () => {
   });
 });
 
-describe('2D 投影（管线世界系口径）', () => {
-  it('py 随管线 +z 增长：minZ 边在画面顶部、maxZ 边在底部', () => {
-    const topLeft = pipelineWorldToPixel(
-      { x: -2761.5009765625, z: -2757.5952 },
-      az3Calibration,
-    );
+describe("2D 投影（管线世界系口径）", () => {
+  it("py 随管线 +z 增长：minZ 边在画面顶部、maxZ 边在底部", () => {
+    const topLeft = pipelineWorldToPixel({ x: -2761.5009765625, z: -2757.5952 }, az3Calibration);
     expect(topLeft.x).toBeCloseTo(0, 6);
     expect(topLeft.y).toBeCloseTo(0, 6);
-    const bottomRight = pipelineWorldToPixel(
-      { x: -1423.978515625, z: -1489.9634 },
-      az3Calibration,
-    );
+    const bottomRight = pipelineWorldToPixel({ x: -1423.978515625, z: -1489.9634 }, az3Calibration);
     expect(bottomRight.x).toBeCloseTo(4096, 6);
     expect(bottomRight.y).toBeCloseTo(4096, 6);
   });
 
-  it('真实样例值：AZ3 POI 锚点 (-1657.2, -1859.3) → 像素 (≈3381.8, ≈2902.6)，落在可玩区内', () => {
+  it("真实样例值：AZ3 POI 锚点 (-1657.2, -1859.3) → 像素 (≈3381.8, ≈2902.6)，落在可玩区内", () => {
     const pixel = pipelineWorldToPixel({ x: -1657.2, z: -1859.3 }, az3Calibration);
     expect(pixel.x).toBeCloseTo(3381.8, 0);
     expect(pixel.y).toBeCloseTo(2902.6, 0);
@@ -106,7 +100,7 @@ describe('2D 投影（管线世界系口径）', () => {
     expect(pixel.y).toBeLessThanOrEqual(826 + 3195);
   });
 
-  it('pixel → world 逆变换往返还原', () => {
+  it("pixel → world 逆变换往返还原", () => {
     const world = { x: -1657.2, z: -1859.3 };
     const pixel = pipelineWorldToPixel(world, az3Calibration);
     const back = pipelinePixelToWorld(pixel, az3Calibration);
@@ -114,7 +108,7 @@ describe('2D 投影（管线世界系口径）', () => {
     expect(back.z).toBeCloseTo(world.z, 6);
   });
 
-  it('两口径等价性：源世界点经 Z 镜像 + 标定盒同步镜像后，两公式给出同一像素', () => {
+  it("两口径等价性：源世界点经 Z 镜像 + 标定盒同步镜像后，两公式给出同一像素", () => {
     // 源世界系标定（z 未镜像）与点 (3645.988, 7877.95)。
     const originalWorld = { x: 3645.988, z: 7877.95 };
     const mirroredWorld = { x: originalWorld.x, z: -originalWorld.z };

@@ -10,35 +10,35 @@ export class DmapError extends Error {
 
   constructor(code: string, message: string) {
     super(message);
-    this.name = 'DmapError';
+    this.name = "DmapError";
     this.code = code;
   }
 }
 
-/** 容器头不合法：magic 错误、版本不支持、长度截断、字段越界。 */
+/** 容器头不合法：magic 错误、版本不支持、长度截断、字段越界、清单不合法。 */
 export class DmapFormatError extends DmapError {
   constructor(
-    code: 'bad_header' | 'unsupported_version' | 'truncated' | 'bad_bundle',
+    code: "bad_header" | "unsupported_version" | "truncated" | "bad_bundle" | "bad_manifest",
     message: string,
   ) {
     super(code, message);
-    this.name = 'DmapFormatError';
+    this.name = "DmapFormatError";
   }
 }
 
 /** 密钥材料不合法：段数/段长不符。 */
 export class DmapKeyError extends DmapError {
   constructor(message: string) {
-    super('bad_key_material', message);
-    this.name = 'DmapKeyError';
+    super("bad_key_material", message);
+    this.name = "DmapKeyError";
   }
 }
 
 /** 载荷完整性校验失败：数据被篡改或密钥不匹配。 */
 export class DmapIntegrityError extends DmapError {
   constructor(message: string) {
-    super('integrity_check_failed', message);
-    this.name = 'DmapIntegrityError';
+    super("integrity_check_failed", message);
+    this.name = "DmapIntegrityError";
   }
 }
 
@@ -47,8 +47,8 @@ export class DmapEntryError extends DmapError {
   readonly entryName: string;
 
   constructor(entryName: string) {
-    super('entry_not_found', `条目不存在: ${entryName}`);
-    this.name = 'DmapEntryError';
+    super("entry_not_found", `条目不存在: ${entryName}`);
+    this.name = "DmapEntryError";
     this.entryName = entryName;
   }
 }

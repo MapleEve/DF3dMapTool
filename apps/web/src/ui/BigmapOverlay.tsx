@@ -1,27 +1,22 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   floorCalibration,
   floorImageInfo,
   getIconObjectUrl,
   resolveFloorEntry,
   type RawMap2dFloor,
-} from '@/data';
-import {
-  MAX_ZOOM_INDEX,
-  MIN_ZOOM_INDEX,
-  planTeleport,
-  resolveTeleportFloor,
-} from '@/bigmap';
-import { BigmapCanvas, type BigmapController, type BigmapPoiMarker } from '@/bigmap/BigmapCanvas';
-import type { WorldXZ } from '@/bigmap/types';
-import { filterPois } from '@/poi/filter';
-import { useFloorStore } from '@/state/floorStore';
-import { useMapDataStore } from '@/state/mapDataStore';
-import { useMapStore } from '@/state/mapStore';
-import { usePoiFilterStore } from '@/state/poiFilterStore';
-import { usePoiStore } from '@/state/poiStore';
-import { useUiStore } from '@/state/uiStore';
+} from "@/data";
+import { MAX_ZOOM_INDEX, MIN_ZOOM_INDEX, planTeleport, resolveTeleportFloor } from "@/bigmap";
+import { BigmapCanvas, type BigmapController, type BigmapPoiMarker } from "@/bigmap/BigmapCanvas";
+import type { WorldXZ } from "@/bigmap/types";
+import { filterPois } from "@/poi/filter";
+import { useFloorStore } from "@/state/floorStore";
+import { useMapDataStore } from "@/state/mapDataStore";
+import { useMapStore } from "@/state/mapStore";
+import { usePoiFilterStore } from "@/state/poiFilterStore";
+import { usePoiStore } from "@/state/poiStore";
+import { useUiStore } from "@/state/uiStore";
 
 /**
  * 2D 俯视大地图覆盖层（M 键全屏）。
@@ -52,7 +47,7 @@ export function BigmapOverlay() {
   const [iconVersion, setIconVersion] = useState(0);
   const iconImagesRef = useRef(new Map<string, HTMLImageElement>());
   const controllerRef = useRef<BigmapController | null>(null);
-  const loader = bundle?.loader ?? null;
+  const pkg = bundle?.pkg ?? null;
 
   useEffect(() => {
     setBigmapFloor(null);
@@ -70,11 +65,11 @@ export function BigmapOverlay() {
   }, [poiData, bigmapFloor]);
 
   const imageUrl = useMemo(() => {
-    if (loader === null || floorEntry === null || !loader.has(floorEntry.image)) {
+    if (pkg === null || floorEntry === null || !pkg.has(floorEntry.image)) {
       return null;
     }
-    return getIconObjectUrl(loader, floorEntry.image) ?? null;
-  }, [loader, floorEntry]);
+    return getIconObjectUrl(pkg, floorEntry.image) ?? null;
+  }, [pkg, floorEntry]);
 
   const imageSize = useMemo(() => {
     if (floorEntry === null) {
@@ -101,15 +96,16 @@ export function BigmapOverlay() {
     return visible.map((poi) => ({
       id: poi.id,
       world: { x: poi.position.x, z: poi.position.z },
-      color: poiData.categories.find((category) => category.id === poi.categoryId)?.color ?? '#8fa3b8',
-      icon: poi.iconFile !== undefined ? iconImagesRef.current.get(poi.iconFile) ?? null : null,
+      color:
+        poiData.categories.find((category) => category.id === poi.categoryId)?.color ?? "#8fa3b8",
+      icon: poi.iconFile !== undefined ? (iconImagesRef.current.get(poi.iconFile) ?? null) : null,
       selected: poi.id === selectedPoiId,
     }));
   }, [poiData, hiddenCategories, bigmapFloor, selectedPoiId, iconVersion]);
 
   // 预加载可见 POI 的图标位图。
   useEffect(() => {
-    if (loader === null || poiData === null) {
+    if (pkg === null || poiData === null) {
       return;
     }
     let cancelled = false;
@@ -120,7 +116,7 @@ export function BigmapOverlay() {
       }
     }
     for (const file of files) {
-      const url = getIconObjectUrl(loader, file);
+      const url = getIconObjectUrl(pkg, file);
       if (url === undefined) {
         continue;
       }
@@ -142,7 +138,7 @@ export function BigmapOverlay() {
     return () => {
       cancelled = true;
     };
-  }, [loader, poiData, markers]);
+  }, [pkg, poiData, markers]);
 
   const regions = useMemo(() => {
     if (poiData === null) {
@@ -175,7 +171,11 @@ export function BigmapOverlay() {
   );
 
   // 传送执行：楼层同步 → 3D 相机飞行 → 返回 3D（大地图关闭，相机记忆新落点）。
-  const teleportToWorld = (world: WorldXZ, worldY: number | undefined, targetFloor: number | null) => {
+  const teleportToWorld = (
+    world: WorldXZ,
+    worldY: number | undefined,
+    targetFloor: number | null,
+  ) => {
     const plan = planTeleport({ world, worldY, targetFloor, currentFloor: floor, floors });
     if (plan.floorChanged) {
       setFloor(plan.floor);
@@ -222,7 +222,7 @@ export function BigmapOverlay() {
       value: number | null;
       key: string;
       label: string;
-    }[] = [{ value: null, key: 'overview', label: t('bigmap.overviewFloor') }];
+    }[] = [{ value: null, key: "overview", label: t("bigmap.overviewFloor") }];
     const floorItems: readonly {
       value: number | null;
       key: string;
@@ -232,17 +232,17 @@ export function BigmapOverlay() {
       key: `floor-${value}`,
       label:
         value < 0
-          ? t('floor.basement', { floor: Math.abs(value) })
-          : t('floor.floorName', { floor: value }),
+          ? t("floor.basement", { floor: Math.abs(value) })
+          : t("floor.floorName", { floor: value }),
     }));
     return [...overview, ...floorItems];
   }, [t, floors]);
 
   return (
-    <div className="bigmap-overlay" role="dialog" aria-label={t('bigmap.title')}>
+    <div className="bigmap-overlay" role="dialog" aria-label={t("bigmap.title")}>
       <header className="bigmap-header">
-        <h2>{t('bigmap.title')}</h2>
-        <div className="bigmap-floor-list" role="tablist" aria-label={t('bigmap.floorTitle')}>
+        <h2>{t("bigmap.title")}</h2>
+        <div className="bigmap-floor-list" role="tablist" aria-label={t("bigmap.floorTitle")}>
           {floorOptions.map((option) => {
             const active = bigmapFloor === option.value;
             return (
@@ -251,7 +251,7 @@ export function BigmapOverlay() {
                 type="button"
                 role="tab"
                 aria-selected={active}
-                className={active ? 'bigmap-floor active' : 'bigmap-floor'}
+                className={active ? "bigmap-floor active" : "bigmap-floor"}
                 onClick={() => {
                   setBigmapFloor(option.value);
                   if (option.value !== null) {
@@ -265,10 +265,18 @@ export function BigmapOverlay() {
           })}
         </div>
         <div className="bigmap-zoom-controls">
-          <button type="button" onClick={() => controllerRef.current?.zoomIn()} aria-label={t('bigmap.zoomIn')}>
+          <button
+            type="button"
+            onClick={() => controllerRef.current?.zoomIn()}
+            aria-label={t("bigmap.zoomIn")}
+          >
             +
           </button>
-          <button type="button" onClick={() => controllerRef.current?.zoomOut()} aria-label={t('bigmap.zoomOut')}>
+          <button
+            type="button"
+            onClick={() => controllerRef.current?.zoomOut()}
+            aria-label={t("bigmap.zoomOut")}
+          >
             −
           </button>
           <input
@@ -278,7 +286,7 @@ export function BigmapOverlay() {
             max={MAX_ZOOM_INDEX}
             step={1}
             value={zoomStep}
-            aria-label={t('bigmap.zoomSlider')}
+            aria-label={t("bigmap.zoomSlider")}
             onChange={(event) => {
               const next = Number(event.target.value);
               setZoomStep(next);
@@ -286,7 +294,7 @@ export function BigmapOverlay() {
             }}
           />
           <button type="button" onClick={() => controllerRef.current?.resetView()}>
-            {t('bigmap.resetView')}
+            {t("bigmap.resetView")}
           </button>
         </div>
         <div className="bigmap-teleport-actions">
@@ -296,19 +304,19 @@ export function BigmapOverlay() {
             onClick={handleTeleportPoi}
             title={selectedPoi?.displayName}
           >
-            {t('bigmap.teleportToPoi')}
+            {t("bigmap.teleportToPoi")}
           </button>
           <button type="button" disabled={marker === null} onClick={handleTeleportMarker}>
-            {t('bigmap.teleportToMarker')}
+            {t("bigmap.teleportToMarker")}
           </button>
         </div>
-        <span className="bigmap-hint">{t('bigmap.hint')}</span>
+        <span className="bigmap-hint">{t("bigmap.hint")}</span>
         <button type="button" className="topbar-button" onClick={() => setBigmapOpen(false)}>
-          {t('toolbar.closeBigmap')}
+          {t("toolbar.closeBigmap")}
         </button>
       </header>
       <div className="bigmap-canvas-host">
-        {status === 'ready' && poiData !== null ? (
+        {status === "ready" && poiData !== null ? (
           <BigmapCanvas
             imageUrl={imageUrl}
             imageSize={imageSize}
@@ -327,13 +335,13 @@ export function BigmapOverlay() {
           />
         ) : (
           <p className="bigmap-placeholder">
-            {status === 'ready' ? t('bigmap.needCalibration') : t('sidebar.needMapData')}
+            {status === "ready" ? t("bigmap.needCalibration") : t("sidebar.needMapData")}
           </p>
         )}
       </div>
       {selectedRegion !== null ? (
         <footer className="bigmap-region-bar" role="status">
-          {t('bigmap.selectedRegion', { name: selectedRegion.name })}
+          {t("bigmap.selectedRegion", { name: selectedRegion.name })}
         </footer>
       ) : null}
     </div>

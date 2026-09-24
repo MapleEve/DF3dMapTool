@@ -1,4 +1,4 @@
-import type { Vec3 } from '@/common/geometry';
+import type { Vec3 } from "@/common/geometry";
 
 /**
  * 导航网格数据文档（数据包内中性键，管线转换产物）。
@@ -15,7 +15,7 @@ export interface NavmeshDoc {
   readonly polygonData: string;
 }
 
-export const NAVMESH_FORMAT = 'df3d-navmesh/1';
+export const NAVMESH_FORMAT = "df3d-navmesh/1";
 
 /** 最近点查询结果。 */
 export interface NavPoint {
@@ -377,7 +377,8 @@ export class NavMesh {
         // 代价 = 穿过共享边（portal）中点的路程：当前三角形中心 → 边中点 → 下一三角形中心
         const portal = this.#portalMid(current, next);
         const stepCost =
-          distanceOf(currentTri.centroid, portal) + distanceOf(portal, this.#triangles[next].centroid);
+          distanceOf(currentTri.centroid, portal) +
+          distanceOf(portal, this.#triangles[next].centroid);
         const tentative = currentG + stepCost;
         if (tentative < (gScore.get(next) ?? Infinity)) {
           gScore.set(next, tentative);
@@ -455,8 +456,16 @@ export function navMeshFromDoc(doc: NavmeshDoc): NavMesh | null {
   if (vertexBytes.length === 0 || polygonBytes.length === 0) {
     return null;
   }
-  const vertices = new Float32Array(vertexBytes.buffer, vertexBytes.byteOffset, vertexBytes.byteLength / 4);
-  const indices = new Uint32Array(polygonBytes.buffer, polygonBytes.byteOffset, polygonBytes.byteLength / 4);
+  const vertices = new Float32Array(
+    vertexBytes.buffer,
+    vertexBytes.byteOffset,
+    vertexBytes.byteLength / 4,
+  );
+  const indices = new Uint32Array(
+    polygonBytes.buffer,
+    polygonBytes.byteOffset,
+    polygonBytes.byteLength / 4,
+  );
   for (let i = 0; i < indices.length; i += 1) {
     if (indices[i] >= vertices.length / 3) {
       throw new RangeError(`导航数据顶点索引越界: ${indices[i]}`);

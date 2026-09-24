@@ -1,4 +1,4 @@
-import { Group, type Material, type Object3D } from 'three';
+import { Group, type Material, type Object3D } from "three";
 
 /**
  * 楼层系统：按楼层分组管理场景对象，切层即组显隐。
@@ -35,7 +35,7 @@ export class FloorManager {
       dimOpacity: options.dimOpacity ?? DEFAULT_DIM_OPACITY,
     };
     this.root = new Group();
-    this.root.name = 'floors';
+    this.root.name = "floors";
   }
 
   get availableFloors(): readonly number[] {
@@ -48,7 +48,7 @@ export class FloorManager {
 
   /** 设置可用楼层（升序）；切换当前层到列表中的默认值。 */
   setAvailableFloors(floors: readonly number[], activeFloor?: number): void {
-    this.#availableFloors = [...floors].sort((a, b) => a - b);
+    this.#availableFloors = floors.toSorted((a, b) => a - b);
     this.setActiveFloor(activeFloor ?? this.#availableFloors[0] ?? 0);
   }
 
@@ -101,13 +101,13 @@ export class FloorManager {
       return false;
     }
     let removed = false;
+    const drop = (material: Material): void => {
+      if (entry.materials.delete(material)) {
+        removed = true;
+      }
+    };
     object.traverse((node) => {
       const mesh = node as { material?: Material | Material[] };
-      const drop = (material: Material): void => {
-        if (entry.materials.delete(material)) {
-          removed = true;
-        }
-      };
       if (Array.isArray(mesh.material)) {
         for (const material of mesh.material) {
           drop(material);

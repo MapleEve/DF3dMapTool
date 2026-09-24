@@ -1,8 +1,8 @@
-import { create } from 'zustand';
-import type { Vec3 } from '@/common/geometry';
+import { create } from "zustand";
+import type { Vec3 } from "@/common/geometry";
 
 /** 导航请求状态机：idle → loading → ready / unavailable；unreachable 为寻路无解。 */
-export type NavStatus = 'idle' | 'loading' | 'ready' | 'unavailable' | 'unreachable';
+export type NavStatus = "idle" | "loading" | "ready" | "unavailable" | "unreachable";
 
 interface NavStoreState {
   status: NavStatus;
@@ -29,7 +29,7 @@ interface NavStoreState {
  * 结果回填供 3D 路径层与 HUD 使用。
  */
 export const useNavStore = create<NavStoreState>()((set) => ({
-  status: 'idle',
+  status: "idle",
   targetLabel: null,
   path: null,
   distance: null,
@@ -37,17 +37,17 @@ export const useNavStore = create<NavStoreState>()((set) => ({
   requestTarget: null,
   requestPath: (target, label) =>
     set((state) => ({
-      status: 'loading',
+      status: "loading",
       targetLabel: label,
       path: null,
       distance: null,
       requestSeq: state.requestSeq + 1,
       requestTarget: target,
     })),
-  setLoading: () => set({ status: 'loading' }),
-  setReady: (path, distance) => set({ status: 'ready', path, distance }),
-  setUnreachable: () => set({ status: 'unreachable', path: null, distance: null }),
-  setUnavailable: () => set({ status: 'unavailable', path: null, distance: null }),
+  setLoading: () => set({ status: "loading" }),
+  setReady: (path, distance) => set({ status: "ready", path, distance }),
+  setUnreachable: () => set({ status: "unreachable", path: null, distance: null }),
+  setUnavailable: () => set({ status: "unavailable", path: null, distance: null }),
   clear: () =>
-    set({ status: 'idle', targetLabel: null, path: null, distance: null, requestTarget: null }),
+    set({ status: "idle", targetLabel: null, path: null, distance: null, requestTarget: null }),
 }));

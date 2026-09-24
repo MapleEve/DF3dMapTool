@@ -1,22 +1,19 @@
-import { useEffect, useRef, useState } from 'react';
-import type { Vec3 } from '@/common/geometry';
-import { loadMapBundle, mapLoadErrorCode, readMapPoiData, type MapBundle } from '@/data';
-import type { MapViewer, ScreenAnchor } from '@/engine';
-import { MinimapHudContainer } from '@/bigmap';
-import { FRAME_LIMIT_FPS, QUALITY_PIXEL_RATIO, useUiStore } from '@/state/uiStore';
-import { useFloorStore } from '@/state/floorStore';
-import { useMapDataStore } from '@/state/mapDataStore';
-import { useMapStore } from '@/state/mapStore';
-import { useNavStore } from '@/state/navStore';
-import { usePoiStore } from '@/state/poiStore';
-import { NavPathHud } from './NavPathHud';
-import { PoiOverlay, type PoiProjector } from './PoiOverlay';
+import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import type { Vec3 } from "@/common/geometry";
+import { loadMapBundle, mapLoadErrorCode, readMapPoiData, type MapBundle } from "@/data";
+import type { MapViewer, ScreenAnchor } from "@/engine";
+import { getMapById } from "@/map";
+import { MinimapHudContainer } from "@/bigmap";
+import { FRAME_LIMIT_FPS, QUALITY_PIXEL_RATIO, useUiStore } from "@/state/uiStore";
+import { useFloorStore } from "@/state/floorStore";
+import { useMapDataStore } from "@/state/mapDataStore";
+import { useMapStore } from "@/state/mapStore";
+import { useNavStore } from "@/state/navStore";
+import { usePoiStore } from "@/state/poiStore";
+import { NavPathHud } from "./NavPathHud";
+import { PoiOverlay, type PoiProjector } from "./PoiOverlay";
 
-/**
- * 容器下载/解密在总进度中的权重（0..1），其余进度由 chunk 流式加载推进。
- * 下载是首屏的主要等待，chunk 增量在就绪后仍会持续。
- */
-const FETCH_PROGRESS_WEIGHT = 0.7;
 /** HUD 世界坐标/朝向的上报间隔（毫秒）。 */
 const CAMERA_HUD_INTERVAL_MS = 200;
 
@@ -34,6 +31,7 @@ export function MapViewport() {
   const [projector, setProjector] = useState<PoiProjector>(null);
   const mapId = useMapStore((state) => state.mapId);
   const mapStatus = useMapStore((state) => state.status);
+  const loadSeq = useMapStore((state) => state.loadSeq);
   const quality = useUiStore((state) => state.quality);
   const fov = useUiStore((state) => state.fov);
   const sensitivity = useUiStore((state) => state.sensitivity);
@@ -48,7 +46,7 @@ export function MapViewport() {
       if (canvas === null) {
         return null;
       }
-      const { MapViewer } = await import('@/engine');
+      const { MapViewer } = await import("@/engine");
       if (disposed) {
         return null;
       }
@@ -56,7 +54,11 @@ export function MapViewport() {
         antialias: useUiStore.getState().antialias,
       });
       setViewer(created);
-      setProjector(() => (world: Vec3): ScreenAnchor | null => created.projectPoi(world));
+      setProjector(
+        () =>
+          (world: Vec3): ScreenAnchor | null =>
+            created.projectPoi(world),
+      );
       return created;
     })();
     viewerReadyRef.current = ready;
@@ -71,10 +73,11 @@ export function MapViewport() {
     };
   }, []);
 
-  // 数据包加载 + 地图图层挂载（按地图）。
+  // 数据包加载 + 地图图层挂载（按地图；loadSeq 递增驱动同图位失败后的原位重试）。
   useEffect(() => {
     let cancelled = false;
-    useMapStore.getState().setStatus('loading');
+    const attempt = loadSeq + 1; // 本图第 N 次加载尝试（1 起，重试递增）
+    useMapStore.getState().setStatus("loading");
     useMapStore.getState().setProgress(0);
 
     void (async () => {
@@ -83,59 +86,65 @@ export function MapViewport() {
         return;
       }
       if (activeViewer === null) {
-        throw new Error('渲染视口不可用');
+        throw new Error("渲染视口不可用");
       }
 
       const bundle: MapBundle = await loadMapBundle(mapId, (fraction) => {
         if (!cancelled) {
-          useMapStore.getState().setProgress(fraction * FETCH_PROGRESS_WEIGHT);
+          // 索引阶段进度直接驱动加载条（0→1）；分块流式进度就绪后
+          // 由流式徽标单独呈现，不回写加载条。
+          useMapStore.getState().setProgress(fraction);
         }
       });
       if (cancelled) {
         return;
       }
 
-      // 楼层以数据包清单为准，回退注册表标定值；POI/2D 派生数据入 store。
+      // 索引就绪即渲染：楼层以数据包清单为准，POI/2D 派生数据入 store（不等分块）。
       const floors =
-        bundle.manifest.floors.length > 0
-          ? bundle.manifest.floors
-          : bundle.definition.knownFloors;
+        bundle.manifest.floors.length > 0 ? bundle.manifest.floors : bundle.definition.knownFloors;
       useFloorStore.getState().applyFloors(floors, bundle.definition.defaultFloor);
       useMapDataStore.getState().setMapData(mapId, bundle, readMapPoiData(bundle));
 
-      // 引擎复用已解密容器，chunk 流式加载推进剩余进度。
+      // 引擎复用已打开的分片包，分块容器按需并行拉取（并发池 + 跨流聚合进度）。
+      // 流式统计写入 mapStore（仅徽标订阅）：不把引擎回调耦合成本地 state，
+      // 避免每次份额推送都重渲染整个视口子树（POI 标注层等）。
       await activeViewer.loadMap(mapId, {
-        loader: bundle.loader,
-        baseUrl: bundle.definition.bundleUrl,
+        pkg: bundle.pkg,
         onProgress: (stats) => {
-          if (cancelled) {
-            return;
+          if (!cancelled) {
+            useMapStore.getState().setStreamStats(stats);
           }
-          const fraction = Math.min(1, stats.loadedChunks / Math.max(stats.totalChunks, 1));
-          useMapStore
-            .getState()
-            .setProgress(FETCH_PROGRESS_WEIGHT + (1 - FETCH_PROGRESS_WEIGHT) * fraction);
         },
       });
       if (cancelled) {
         return;
       }
-      useMapStore.getState().setProgress(1);
-      useMapStore.getState().setStatus('ready');
+      useMapStore.getState().setStatus("ready");
     })().catch((error: unknown) => {
       if (cancelled) {
         return;
       }
       // 未预期失败的完整原因进控制台（状态栏只展示归类码）。
-      console.error('地图数据加载失败', error);
+      console.error(`地图数据加载失败（第 ${attempt} 次尝试）`, error);
+      // 失败即清空视口：避免「状态栏已是新图 + 画布仍渲染旧图场景」的失同步
+      // （旧图的分块流也随 unload 一并停止）。
+      const failedViewer = viewerReadyRef.current;
+      void failedViewer?.then((instance) => {
+        instance?.unloadMap();
+      });
       useMapDataStore.getState().clear();
-      useMapStore.getState().setStatus('error', mapLoadErrorCode(error));
+      const definition = getMapById(mapId);
+      if (definition !== undefined) {
+        useFloorStore.getState().applyFloors(definition.knownFloors, definition.defaultFloor);
+      }
+      useMapStore.getState().setStatus("error", mapLoadErrorCode(error));
     });
 
     return () => {
       cancelled = true;
     };
-  }, [mapId]);
+  }, [mapId, loadSeq]);
 
   // 画质：渲染像素比上限。
   useEffect(() => {
@@ -210,7 +219,7 @@ export function MapViewport() {
           useNavStore.getState().setReady(path.points, path.distance);
           viewer.setNavPath(path.points);
         } catch (error) {
-          console.error('寻路失败', error);
+          console.error("寻路失败", error);
           if (!cancelled) {
             useNavStore.getState().setUnavailable();
           }
@@ -276,12 +285,12 @@ export function MapViewport() {
           return;
         }
         const url = URL.createObjectURL(blob);
-        const anchor = document.createElement('a');
+        const anchor = document.createElement("a");
         anchor.href = url;
         anchor.download = `df3dmaptool-${Date.now()}.png`;
         anchor.click();
         window.setTimeout(() => URL.revokeObjectURL(url), 5000);
-      }, 'image/png');
+      }, "image/png");
     });
     return () => {
       useUiStore.getState().registerScreenshot(null);
@@ -295,6 +304,7 @@ export function MapViewport() {
       <MinimapHudContainer />
       <NavPathHud />
       <LoadProgressBar />
+      <StreamProgressBadge />
     </div>
   );
 }
@@ -302,7 +312,7 @@ export function MapViewport() {
 function LoadProgressBar() {
   const status = useMapStore((state) => state.status);
   const progress = useMapStore((state) => state.progress);
-  if (status !== 'loading') {
+  if (status !== "loading") {
     return null;
   }
   return (
@@ -314,6 +324,46 @@ function LoadProgressBar() {
       aria-valuenow={Math.round(progress * 100)}
     >
       <div className="load-progress-fill" style={{ width: `${Math.round(progress * 100)}%` }} />
+    </div>
+  );
+}
+
+/**
+ * 场景流式进度徽标（就绪后）：索引就绪即翻「就绪」是既定设计，
+ * 分块流的跨流聚合进度（已载实例/总实例）在此持续呈现，
+ * 有 pending 或失败冷却中的分块时可见，排空后自动隐藏。
+ * 自行订阅 mapStore.streamStats——份额推送只重渲染本徽标，
+ * 不波及 POI 标注层等视口子树。
+ */
+function StreamProgressBadge() {
+  const { t } = useTranslation();
+  const status = useMapStore((state) => state.status);
+  const stats = useMapStore((state) => state.streamStats);
+  if (
+    status !== "ready" ||
+    stats === null ||
+    (stats.pendingChunks <= 0 && stats.failedChunks <= 0)
+  ) {
+    return null;
+  }
+  const percent = Math.round(stats.fraction * 100);
+  const failed = stats.failedChunks > 0;
+  return (
+    <div className={`stream-progress${failed ? " stream-progress-failed" : ""}`} role="status">
+      <span>
+        {failed
+          ? t("status.streamFailed", { count: stats.failedChunks })
+          : t("status.streaming", { percent })}
+      </span>
+      <div
+        className="stream-progress-bar"
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={percent}
+      >
+        <div className="stream-progress-fill" style={{ width: `${percent}%` }} />
+      </div>
     </div>
   );
 }

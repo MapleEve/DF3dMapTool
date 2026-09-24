@@ -1,12 +1,12 @@
-import { useEffect } from 'react';
-import { BigmapOverlay } from './ui/BigmapOverlay';
-import { MapViewport } from './ui/MapViewport';
-import { SettingsPanel } from './ui/SettingsPanel';
-import { Sidebar } from './ui/Sidebar';
-import { StatusBar } from './ui/StatusBar';
-import { TopBar } from './ui/TopBar';
-import { useUiStore } from './state/uiStore';
-import './ui/ui.css';
+import { useEffect } from "react";
+import { BigmapOverlay } from "./ui/BigmapOverlay";
+import { MapViewport } from "./ui/MapViewport";
+import { SettingsPanel } from "./ui/SettingsPanel";
+import { Sidebar } from "./ui/Sidebar";
+import { StatusBar } from "./ui/StatusBar";
+import { TopBar } from "./ui/TopBar";
+import { useUiStore } from "./state/uiStore";
+import "./ui/ui.css";
 
 export default function App() {
   const bigmapOpen = useUiStore((state) => state.bigmapOpen);
@@ -16,7 +16,7 @@ export default function App() {
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
+      if (event.key === "Escape") {
         // Esc 逐层关闭：先设置面板，再大地图。
         if (useUiStore.getState().settingsOpen) {
           setSettingsOpen(false);
@@ -35,13 +35,13 @@ export default function App() {
         target instanceof HTMLInputElement ||
         target instanceof HTMLTextAreaElement ||
         target instanceof HTMLSelectElement;
-      if (!typing && event.key.toLowerCase() === 'm') {
+      if (!typing && event.key.toLowerCase() === "m") {
         event.preventDefault();
         toggleBigmap();
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [toggleBigmap, setBigmapOpen, setSettingsOpen]);
 
   return (

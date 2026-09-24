@@ -1,5 +1,5 @@
-import { pipelineWorldToUv } from './project';
-import type { BigmapCalibration, WorldXZ } from './types';
+import { pipelineWorldToUv } from "./project";
+import type { BigmapCalibration, WorldXZ } from "./types";
 
 /**
  * HUD 小地图取景（对齐 WGMiniMap GetMapImageRect 语义）：

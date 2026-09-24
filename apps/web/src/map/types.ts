@@ -1,10 +1,10 @@
-import type { Vec3 } from '@/common/geometry';
+import type { Vec3 } from "@/common/geometry";
 
 /** 可切换地图的数字 ID（与游戏内地图编号一致）。 */
 export type MapId = 101 | 102 | 104 | 105 | 106 | 203;
 
-/** 地图资产代号，同时是数据包文件名（/assets/<code>.dmap）。 */
-export type MapCode = 'az3' | 'brakkesh' | 'damiris' | 'forrest' | 'spacecenter' | 'tideprison';
+/** 地图资产代号，同时是数据包目录名（/assets/<code>/）。 */
+export type MapCode = "az3" | "brakkesh" | "damiris" | "forrest" | "spacecenter" | "tideprison";
 
 /** 地图显示名的 i18n 键（对应 resources.translation.maps.*）。 */
 export type MapNameKey = `maps.${MapCode}`;
@@ -19,7 +19,7 @@ export interface MapDefinition {
   readonly knownFloors: readonly number[];
   /** 进入地图时的默认楼层。 */
   readonly defaultFloor: number;
-  /** 数据包地址。 */
+  /** 数据包索引容器地址（分块/导航容器按清单相对路径派生）。 */
   readonly bundleUrl: string;
   /** 已标定的摆放规模（标定信息，供状态栏展示）。 */
   readonly knownPlacementCount?: number;

@@ -1,4 +1,4 @@
-import { packBundle, type BundleEntry } from './bundle.js';
+import { packBundle, type BundleEntry } from "./bundle.js";
 import {
   encodeHeader,
   FORMAT_VERSION,
@@ -6,8 +6,8 @@ import {
   sealPayload,
   HEADER_BYTES,
   IV_BYTES,
-} from './container.js';
-import { resolveAesKey, type DmapKeySource } from './key.js';
+} from "./container.js";
+import { resolveAesKey, type DmapKeySource } from "./key.js";
 
 export interface DmapWriteOptions {
   /** 容器 flags 位段，保留给未来特性；默认 0。 */
@@ -39,7 +39,7 @@ export class DmapWriter {
   /** 添加一条二进制数据；条目名必须唯一且非空。 */
   add(name: string, mime: string, data: Uint8Array): this {
     if (name.length === 0) {
-      throw new RangeError('条目名不能为空');
+      throw new RangeError("条目名不能为空");
     }
     if (this.#entries.some((entry) => entry.name === name)) {
       throw new RangeError(`条目名重复: ${name}`);
@@ -49,12 +49,12 @@ export class DmapWriter {
   }
 
   /** 添加 UTF-8 文本条目。 */
-  addText(name: string, text: string, mime = 'text/plain; charset=utf-8'): this {
+  addText(name: string, text: string, mime = "text/plain; charset=utf-8"): this {
     return this.add(name, mime, encoder.encode(text));
   }
 
   /** 添加 JSON 条目。 */
-  addJson(name: string, value: unknown, mime = 'application/json'): this {
+  addJson(name: string, value: unknown, mime = "application/json"): this {
     return this.addText(name, JSON.stringify(value), mime);
   }
 

@@ -1,14 +1,14 @@
-import { useEffect, useMemo, useRef } from 'react';
-import type { Vec3 } from '@/common/geometry';
-import { getIconObjectUrl } from '@/data';
-import type { ScreenAnchor } from '@/engine';
-import { filterPois } from '@/poi/filter';
-import type { PoiDefinition } from '@/poi/types';
-import { useFloorStore } from '@/state/floorStore';
-import { useMapDataStore } from '@/state/mapDataStore';
-import { usePoiFilterStore } from '@/state/poiFilterStore';
-import { usePoiStore } from '@/state/poiStore';
-import { PoiBubble } from './PoiBubble';
+import { useEffect, useMemo, useRef } from "react";
+import type { Vec3 } from "@/common/geometry";
+import { getIconObjectUrl } from "@/data";
+import type { ScreenAnchor } from "@/engine";
+import { filterPois } from "@/poi/filter";
+import type { PoiDefinition } from "@/poi/types";
+import { useFloorStore } from "@/state/floorStore";
+import { useMapDataStore } from "@/state/mapDataStore";
+import { usePoiFilterStore } from "@/state/poiFilterStore";
+import { usePoiStore } from "@/state/poiStore";
+import { PoiBubble } from "./PoiBubble";
 
 const BUBBLE_WIDTH_PX = 264;
 const BUBBLE_HEIGHT_PX = 200;
@@ -68,13 +68,15 @@ export function PoiOverlay({ projector }: PoiOverlayProps) {
     if (poiData === null) {
       return urls;
     }
-    const loader = useMapDataStore.getState().bundle?.loader ?? null;
-    if (loader === null) {
+    // zustand 的 getState 是 store 对象的静态读取（非 hook 调用），渲染期合法。
+    // oxlint-disable-next-line react/hooks
+    const pkg = useMapDataStore.getState().bundle?.pkg ?? null;
+    if (pkg === null) {
       return urls;
     }
     for (const poi of visiblePois) {
       if (poi.iconFile !== undefined && !urls.has(poi.iconFile)) {
-        const url = getIconObjectUrl(loader, poi.iconFile);
+        const url = getIconObjectUrl(pkg, poi.iconFile);
         if (url !== undefined) {
           urls.set(poi.iconFile, url);
         }
@@ -97,11 +99,14 @@ export function PoiOverlay({ projector }: PoiOverlayProps) {
         }
         const anchor = projector(poi.position);
         if (anchor === null || !anchor.visible) {
-          node.style.display = 'none';
-          screenPositions.current.set(poi.id, anchor === null ? null : { x: anchor.x, y: anchor.y });
+          node.style.display = "none";
+          screenPositions.current.set(
+            poi.id,
+            anchor === null ? null : { x: anchor.x, y: anchor.y },
+          );
           continue;
         }
-        node.style.display = '';
+        node.style.display = "";
         node.style.transform = `translate(${anchor.x.toFixed(1)}px, ${anchor.y.toFixed(1)}px)`;
         screenPositions.current.set(poi.id, { x: anchor.x, y: anchor.y });
       }
@@ -115,7 +120,7 @@ export function PoiOverlay({ projector }: PoiOverlayProps) {
         const anchor =
           selectedPoiId !== null ? screenPositions.current.get(selectedPoiId) : undefined;
         if (anchor === null || anchor === undefined) {
-          bubble.style.display = 'none';
+          bubble.style.display = "none";
         } else {
           const x = Math.min(
             Math.max(BUBBLE_MARGIN_PX, anchor.x),
@@ -125,7 +130,7 @@ export function PoiOverlay({ projector }: PoiOverlayProps) {
             Math.max(BUBBLE_MARGIN_PX, anchor.y),
             Math.max(BUBBLE_MARGIN_PX, maxHeight - BUBBLE_HEIGHT_PX),
           );
-          bubble.style.display = '';
+          bubble.style.display = "";
           bubble.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`;
         }
       }
@@ -155,19 +160,19 @@ export function PoiOverlay({ projector }: PoiOverlayProps) {
               }
             }}
             type="button"
-            className={poi.id === selectedPoiId ? 'poi-marker selected' : 'poi-marker'}
+            className={poi.id === selectedPoiId ? "poi-marker selected" : "poi-marker"}
             title={poi.displayName}
             onClick={() => selectPoi(poi.id === selectedPoiId ? null : poi.id)}
           >
             {iconUrl !== undefined ? (
               <img src={iconUrl} alt="" draggable={false} />
             ) : (
-              <span style={{ backgroundColor: category?.color ?? '#8fa3b8' }} />
+              <span style={{ backgroundColor: category?.color ?? "#8fa3b8" }} />
             )}
           </button>
         );
       })}
-      <div ref={bubbleRef} className="poi-bubble-anchor" style={{ display: 'none' }}>
+      <div ref={bubbleRef} className="poi-bubble-anchor" style={{ display: "none" }}>
         {selectedPoi !== null ? (
           <PoiBubble
             poi={selectedPoi}

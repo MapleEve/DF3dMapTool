@@ -1,6 +1,6 @@
-import type { Vec3 } from '@/common/geometry';
-import { pipelinePixelToWorld } from './project';
-import type { BigmapCalibration, PixelPoint, WorldXZ } from './types';
+import type { Vec3 } from "@/common/geometry";
+import { pipelinePixelToWorld } from "./project";
+import type { BigmapCalibration, PixelPoint, WorldXZ } from "./types";
 
 /**
  * 2D → 3D 传送规划（对齐原 2DBigMap 传送交互：右键标记 / POI 详情
@@ -41,8 +41,7 @@ export function resolveTeleportFloor(poiFloor: number, bigmapFloor: number | nul
 /** 依据输入生成传送计划（纯函数，供组件与单测复用）。 */
 export function planTeleport(input: TeleportPlanInput): TeleportPlan {
   const { world, worldY, targetFloor, currentFloor, floors } = input;
-  const floor =
-    targetFloor !== null && floors.includes(targetFloor) ? targetFloor : currentFloor;
+  const floor = targetFloor !== null && floors.includes(targetFloor) ? targetFloor : currentFloor;
   return {
     position: { x: world.x, y: worldY ?? 0, z: world.z },
     floor,
@@ -51,9 +50,6 @@ export function planTeleport(input: TeleportPlanInput): TeleportPlan {
 }
 
 /** 大地图点击像素 → 管线世界系落点（传送链路的 2D 侧入口）。 */
-export function markerPixelToWorld(
-  pixel: PixelPoint,
-  calibration: BigmapCalibration,
-): WorldXZ {
+export function markerPixelToWorld(pixel: PixelPoint, calibration: BigmapCalibration): WorldXZ {
   return pipelinePixelToWorld(pixel, calibration);
 }

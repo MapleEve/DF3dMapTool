@@ -1,5 +1,5 @@
-import { Vector3, type Camera } from 'three';
-import type { Vec3 } from '@/common/geometry';
+import { Vector3, type Camera } from "three";
+import type { Vec3 } from "@/common/geometry";
 
 /**
  * POI 世界坐标 → 屏幕像素投影接口（供 UI 层锚定 HTML 标记）。
@@ -38,8 +38,7 @@ export function projectToScreen(
   return {
     x: (point.x * 0.5 + 0.5) * viewportWidth,
     y: (-point.y * 0.5 + 0.5) * viewportHeight,
-    visible:
-      point.x >= -1 && point.x <= 1 && point.y >= -1 && point.y <= 1 && distance > 0,
+    visible: point.x >= -1 && point.x <= 1 && point.y >= -1 && point.y <= 1 && distance > 0,
     distance,
   };
 }

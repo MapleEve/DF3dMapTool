@@ -1,8 +1,8 @@
-import type { DmapLoader } from '@df3dmaptool/dmap';
-import { categoriesFromTypeConfig } from '@/poi/categories';
-import type { PoiCategory, PoiDefinition } from '@/poi/types';
-import type { Vec3 } from '@/common/geometry';
-import type { MapBundle } from './manifest';
+import type { DmapMapPackage } from "@df3dmaptool/dmap";
+import { categoriesFromTypeConfig } from "@/poi/categories";
+import type { PoiCategory, PoiDefinition } from "@/poi/types";
+import type { Vec3 } from "@/common/geometry";
+import type { MapBundle } from "./loadMap";
 
 /**
  * 数据包 → 运行时视图数据的派生层。
@@ -144,17 +144,17 @@ export function toPipelineWorld(values: readonly number[]): Vec3 {
   return { x: values[0] ?? 0, y: values[1] ?? 0, z: -(values[2] ?? 0) };
 }
 
-/** 从数据包读取并派生全部 UI 视图数据（同步、纯内存）。 */
+/** 从数据包读取并派生全部 UI 视图数据（同步、纯内存；索引容器随 openIndex 即可读）。 */
 export function readMapPoiData(bundle: MapBundle): MapPoiData {
-  const { loader, manifest, definition } = bundle;
-  const rawPois = loader.readJson<RawPoi[]>(manifest.entries.poi);
-  const types = loader.readJson<RawPoiType[]>('configs/poi_type_config.json');
-  const items = loader.readJson<RawPoiItem[]>('configs/poi_item_config.json');
-  const regions = loader.readJson<RawMapRegion[]>('configs/map_region_config.json');
-  const mapConfigs = loader.readJson<RawMapConfigEntry[]>('configs/map_config.json');
-  const map2d = loader.readJson<RawMap2d>(manifest.entries.map2d);
-  const minimapIndex = loader.readJson<RawMinimapIndex>(manifest.entries.minimaps);
-  const iconIndex = loader.readJson<RawIconIndex>(manifest.entries.icons);
+  const { pkg, manifest, definition } = bundle;
+  const rawPois = pkg.readJson<RawPoi[]>(manifest.entries.poi);
+  const types = pkg.readJson<RawPoiType[]>("configs/poi_type_config.json");
+  const items = pkg.readJson<RawPoiItem[]>("configs/poi_item_config.json");
+  const regions = pkg.readJson<RawMapRegion[]>("configs/map_region_config.json");
+  const mapConfigs = pkg.readJson<RawMapConfigEntry[]>("configs/map_config.json");
+  const map2d = pkg.readJson<RawMap2d>(manifest.entries.map2d);
+  const minimapIndex = pkg.readJson<RawMinimapIndex>(manifest.entries.minimaps);
+  const iconIndex = pkg.readJson<RawIconIndex>(manifest.entries.icons);
 
   const itemById = new Map(items.map((item) => [item.Id, item]));
   const categories = categoriesFromTypeConfig(types);
@@ -169,9 +169,9 @@ export function readMapPoiData(bundle: MapBundle): MapPoiData {
       id: String(raw.id),
       mapId: definition.id,
       floor: raw.floor,
-      categoryId: item !== undefined ? `t${item.TypeId}` : 'landmark',
+      categoryId: item !== undefined ? `t${item.TypeId}` : "landmark",
       // location 为空时兜底 description / 物品名，避免 UI 出现空名与检索盲区。
-      displayName: raw.location || raw.description || item?.Name || '',
+      displayName: raw.location || raw.description || item?.Name || "",
       nameKey: raw.locationKey || undefined,
       position: asVec3(raw.worldPos),
       iconKey: raw.icon || item?.Icon || undefined,
@@ -182,7 +182,7 @@ export function readMapPoiData(bundle: MapBundle): MapPoiData {
         itemId: raw.itemId,
         mapMode: raw.mapMode,
         quality: item?.Quality ?? 0,
-        itemName: item?.Name ?? '',
+        itemName: item?.Name ?? "",
       },
     });
   }
@@ -229,28 +229,28 @@ interface RawIconIndex {
 }
 type RawMinimapIndex = readonly RawMinimapInfo[];
 
-const iconUrlCaches = new WeakMap<DmapLoader, Map<string, string>>();
+const iconUrlCaches = new WeakMap<DmapMapPackage, Map<string, string>>();
 
 /**
- * 读取数据包内图标为 object URL（按加载器缓存，调用方持有至不再使用）。
+ * 读取数据包内图标为 object URL（按数据包缓存，调用方持有至不再使用）。
  * 路径缺失或读取失败返回 undefined，由调用方走占位渲染。
  */
-export function getIconObjectUrl(loader: DmapLoader, iconFile: string): string | undefined {
-  let cache = iconUrlCaches.get(loader);
+export function getIconObjectUrl(pkg: DmapMapPackage, iconFile: string): string | undefined {
+  let cache = iconUrlCaches.get(pkg);
   if (cache === undefined) {
     cache = new Map();
-    iconUrlCaches.set(loader, cache);
+    iconUrlCaches.set(pkg, cache);
   }
   const cached = cache.get(iconFile);
   if (cached !== undefined) {
     return cached;
   }
-  if (!loader.has(iconFile)) {
+  if (!pkg.has(iconFile)) {
     return undefined;
   }
   try {
-    const bytes = loader.read(iconFile);
-    const url = URL.createObjectURL(new Blob([bytes.buffer as ArrayBuffer], { type: 'image/png' }));
+    const bytes = pkg.read(iconFile);
+    const url = URL.createObjectURL(new Blob([bytes.buffer as ArrayBuffer], { type: "image/png" }));
     cache.set(iconFile, url);
     return url;
   } catch {
@@ -268,7 +268,7 @@ export function resolveFloorEntry(map2d: RawMap2d, floor: number | null): RawMap
   if (floor === null) {
     return overview;
   }
-  const suffix = new RegExp(`_${floor}f$`, 'i');
+  const suffix = new RegExp(`_${floor}f$`, "i");
   return map2d.floors.find((entry) => suffix.test(entry.floorName)) ?? overview;
 }
 

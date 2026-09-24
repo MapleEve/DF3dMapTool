@@ -1,4 +1,4 @@
-import type { PoiCategoryId, PoiDefinition } from './types';
+import type { PoiCategoryId, PoiDefinition } from "./types";
 
 /**
  * POI 过滤状态：隐藏的分类 + 当前楼层。

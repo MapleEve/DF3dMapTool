@@ -1,4 +1,4 @@
-import type { Vec3 } from '@/common/geometry';
+import type { Vec3 } from "@/common/geometry";
 
 /**
  * chunk 空间分桶与调度（纯逻辑，无 three 依赖，可独立单测）。
@@ -12,12 +12,11 @@ import type { Vec3 } from '@/common/geometry';
 export type FrustumPlane = readonly [nx: number, ny: number, nz: number, d: number];
 export type FrustumPlanes = readonly FrustumPlane[];
 
-/** 数据包 manifest.chunkBounds 中的一条 chunk 元数据。 */
+/** 数据包清单 chunks[] 中的一条 chunk 元数据。 */
 export interface ChunkInfo {
   readonly id: string;
+  /** 分块容器路径（相对地图资产目录，如 chunks/c_-25_-15.dmap）。 */
   readonly file: string;
-  /** 所属容器序号（manifest.containers 下标）。 */
-  readonly container: number;
   readonly boundsMin: readonly [number, number, number];
   readonly boundsMax: readonly [number, number, number];
 }
@@ -78,11 +77,7 @@ export function distanceSqToPointAabb(point: Vec3, min: Vec3, max: Vec3): number
  * AABB 与视锥相交判定（无精确裁剪需求，宁可误留不可误删）：
  * 对每个平面取「正向最远角」做快速拒绝。
  */
-export function aabbIntersectsFrustum(
-  min: Vec3,
-  max: Vec3,
-  planes: FrustumPlanes,
-): boolean {
+export function aabbIntersectsFrustum(min: Vec3, max: Vec3, planes: FrustumPlanes): boolean {
   for (const plane of planes) {
     const [nx, ny, nz, d] = plane;
     const px = nx >= 0 ? max.x : min.x;
@@ -142,11 +137,8 @@ export function selectChunks(options: SelectChunksOptions): SelectChunksResult {
 }
 
 /** 按「中心距离（AABB 最近点）」升序排序，用于加载队列优先级。 */
-export function sortByDistance(
-  chunks: readonly ChunkRecord[],
-  center: Vec3,
-): ChunkRecord[] {
-  return [...chunks].sort((a, b) => {
+export function sortByDistance(chunks: readonly ChunkRecord[], center: Vec3): ChunkRecord[] {
+  return chunks.toSorted((a, b) => {
     const da = distanceSqToPointAabb(center, a.center, a.center);
     const db = distanceSqToPointAabb(center, b.center, b.center);
     return da - db;

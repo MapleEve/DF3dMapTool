@@ -1,4 +1,4 @@
-import type { Euler3, Quaternion4, Vec3 } from '@/common/geometry';
+import type { Euler3, Quaternion4, Vec3 } from "@/common/geometry";
 
 /**
  * 世界坐标与旋转的统一变换规则（管线与运行时共用同一约定）：
@@ -18,7 +18,7 @@ import type { Euler3, Quaternion4, Vec3 } from '@/common/geometry';
  */
 
 /** 源欧拉角的内旋顺序。 */
-export const SOURCE_EULER_ORDER = 'YXZ' as const;
+export const SOURCE_EULER_ORDER = "YXZ" as const;
 
 function hamiltonMultiply(a: Quaternion4, b: Quaternion4): Quaternion4 {
   return {

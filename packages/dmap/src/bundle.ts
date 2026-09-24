@@ -1,4 +1,4 @@
-import { DmapEntryError, DmapFormatError } from './errors.js';
+import { DmapEntryError, DmapFormatError } from "./errors.js";
 
 /** GLB 容器 magic，ASCII "glTF"。 */
 const GLB_MAGIC = 0x46546c67;
@@ -12,7 +12,7 @@ const CHUNK_TYPE_JSON = 0x4e4f534a;
 const CHUNK_TYPE_BIN = 0x004e4942;
 
 /** dmapc 索引的生成器标识。 */
-export const DMAPC_GENERATOR = 'dmap-writer/1';
+export const DMAPC_GENERATOR = "dmap-writer/1";
 
 /** 待打包的一条数据。 */
 export interface BundleEntry {
@@ -60,10 +60,10 @@ export function packBundle(entries: readonly BundleEntry[]): Uint8Array {
   const names = new Set<string>();
   for (const entry of entries) {
     if (entry.name.length === 0) {
-      throw new DmapFormatError('bad_bundle', '条目名不能为空');
+      throw new DmapFormatError("bad_bundle", "条目名不能为空");
     }
     if (names.has(entry.name)) {
-      throw new DmapFormatError('bad_bundle', `条目名重复: ${entry.name}`);
+      throw new DmapFormatError("bad_bundle", `条目名重复: ${entry.name}`);
     }
     names.add(entry.name);
   }
@@ -86,7 +86,7 @@ export function packBundle(entries: readonly BundleEntry[]): Uint8Array {
   }
 
   const index: DmapcIndex = {
-    asset: { version: '2.0', generator: DMAPC_GENERATOR },
+    asset: { version: "2.0", generator: DMAPC_GENERATOR },
     dmapc: { entries: indexEntries },
   };
   const jsonBytes = encoder.encode(JSON.stringify(index));
@@ -116,19 +116,19 @@ export function packBundle(entries: readonly BundleEntry[]): Uint8Array {
 /** 解析 GLB 容器，返回 dmapc 索引与 BIN 数据区。 */
 export function unpackBundle(glb: Uint8Array): UnpackedBundle {
   if (glb.length < GLB_HEADER_BYTES) {
-    throw new DmapFormatError('bad_bundle', 'GLB 载荷过短');
+    throw new DmapFormatError("bad_bundle", "GLB 载荷过短");
   }
   const view = new DataView(glb.buffer, glb.byteOffset, glb.byteLength);
   if (view.getUint32(0, true) !== GLB_MAGIC) {
-    throw new DmapFormatError('bad_bundle', 'GLB magic 不正确');
+    throw new DmapFormatError("bad_bundle", "GLB magic 不正确");
   }
   if (view.getUint32(4, true) !== GLB_VERSION) {
-    throw new DmapFormatError('bad_bundle', `不支持的 GLB 版本: ${view.getUint32(4, true)}`);
+    throw new DmapFormatError("bad_bundle", `不支持的 GLB 版本: ${view.getUint32(4, true)}`);
   }
   const totalLength = view.getUint32(8, true);
   if (totalLength !== glb.length) {
     throw new DmapFormatError(
-      'bad_bundle',
+      "bad_bundle",
       `GLB 总长度不一致: 声明 ${totalLength}，实际 ${glb.length}`,
     );
   }
@@ -141,7 +141,7 @@ export function unpackBundle(glb: Uint8Array): UnpackedBundle {
     const chunkType = view.getUint32(cursor + 4, true);
     const dataStart = cursor + CHUNK_HEADER_BYTES;
     if (dataStart + chunkLength > glb.length) {
-      throw new DmapFormatError('bad_bundle', 'GLB chunk 越界');
+      throw new DmapFormatError("bad_bundle", "GLB chunk 越界");
     }
     const chunk = glb.subarray(dataStart, dataStart + chunkLength);
     if (chunkType === CHUNK_TYPE_JSON && jsonChunk === null) {
@@ -153,17 +153,17 @@ export function unpackBundle(glb: Uint8Array): UnpackedBundle {
   }
 
   if (jsonChunk === null) {
-    throw new DmapFormatError('bad_bundle', '缺少 dmapc 索引 chunk');
+    throw new DmapFormatError("bad_bundle", "缺少 dmapc 索引 chunk");
   }
   if (binChunk === null) {
-    throw new DmapFormatError('bad_bundle', '缺少数据 chunk');
+    throw new DmapFormatError("bad_bundle", "缺少数据 chunk");
   }
 
   let parsed: unknown;
   try {
     parsed = JSON.parse(decoder.decode(jsonChunk));
   } catch {
-    throw new DmapFormatError('bad_bundle', 'dmapc 索引不是合法 JSON');
+    throw new DmapFormatError("bad_bundle", "dmapc 索引不是合法 JSON");
   }
   const entries = parseIndexEntries(parsed);
 
@@ -171,28 +171,28 @@ export function unpackBundle(glb: Uint8Array): UnpackedBundle {
 }
 
 function parseIndexEntries(parsed: unknown): DmapcIndexEntry[] {
-  if (typeof parsed !== 'object' || parsed === null) {
-    throw new DmapFormatError('bad_bundle', 'dmapc 索引结构不正确');
+  if (typeof parsed !== "object" || parsed === null) {
+    throw new DmapFormatError("bad_bundle", "dmapc 索引结构不正确");
   }
   const dmapc = (parsed as { dmapc?: unknown }).dmapc;
-  if (typeof dmapc !== 'object' || dmapc === null) {
-    throw new DmapFormatError('bad_bundle', 'dmapc 索引缺少 dmapc 字段');
+  if (typeof dmapc !== "object" || dmapc === null) {
+    throw new DmapFormatError("bad_bundle", "dmapc 索引缺少 dmapc 字段");
   }
   const list = (dmapc as { entries?: unknown }).entries;
   if (!Array.isArray(list)) {
-    throw new DmapFormatError('bad_bundle', 'dmapc 索引缺少 entries 数组');
+    throw new DmapFormatError("bad_bundle", "dmapc 索引缺少 entries 数组");
   }
   return list.map((item, position) => {
-    if (typeof item !== 'object' || item === null) {
+    if (typeof item !== "object" || item === null) {
       throw new DmapFormatError(`bad_bundle`, `索引第 ${position} 项结构不正确`);
     }
     const entry = item as Record<string, unknown>;
     const { name, mime, byteOffset, byteLength } = entry;
-    if (typeof name !== 'string' || typeof mime !== 'string') {
-      throw new DmapFormatError('bad_bundle', `索引第 ${position} 项缺少 name/mime`);
+    if (typeof name !== "string" || typeof mime !== "string") {
+      throw new DmapFormatError("bad_bundle", `索引第 ${position} 项缺少 name/mime`);
     }
-    if (typeof byteOffset !== 'number' || typeof byteLength !== 'number') {
-      throw new DmapFormatError('bad_bundle', `索引第 ${position} 项缺少 byteOffset/byteLength`);
+    if (typeof byteOffset !== "number" || typeof byteLength !== "number") {
+      throw new DmapFormatError("bad_bundle", `索引第 ${position} 项缺少 byteOffset/byteLength`);
     }
     return { name, mime, byteOffset, byteLength };
   });
@@ -207,7 +207,7 @@ export function readEntryData(bundle: UnpackedBundle, name: string): Uint8Array 
   const start = entry.byteOffset;
   const end = entry.byteOffset + entry.byteLength;
   if (end > bundle.bin.length) {
-    throw new DmapFormatError('bad_bundle', `条目 ${name} 越出数据区`);
+    throw new DmapFormatError("bad_bundle", `条目 ${name} 越出数据区`);
   }
   return bundle.bin.subarray(start, end);
 }

@@ -1,21 +1,21 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useTranslation } from 'react-i18next';
-import { getIconObjectUrl, resolveFloorEntry, type RawMap2dFloor } from '@/data';
-import { filterPois } from '@/poi/filter';
-import { useFloorStore } from '@/state/floorStore';
-import { useMapDataStore } from '@/state/mapDataStore';
-import { useMapStore } from '@/state/mapStore';
-import { usePoiFilterStore } from '@/state/poiFilterStore';
-import { usePoiStore } from '@/state/poiStore';
-import { useUiStore } from '@/state/uiStore';
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { getIconObjectUrl, resolveFloorEntry, type RawMap2dFloor } from "@/data";
+import { filterPois } from "@/poi/filter";
+import { useFloorStore } from "@/state/floorStore";
+import { useMapDataStore } from "@/state/mapDataStore";
+import { useMapStore } from "@/state/mapStore";
+import { usePoiFilterStore } from "@/state/poiFilterStore";
+import { usePoiStore } from "@/state/poiStore";
+import { useUiStore } from "@/state/uiStore";
 import {
   minimapWorldSpan,
   minimapWindowUv,
   pipelineWorldDisplayCoords,
   worldToMinimapCanvas,
-} from './minimap';
-import type { BigmapCalibration, WorldXZ } from './types';
-import type { BigmapPoiMarker, BigmapRegionLabel } from './BigmapCanvas';
+} from "./minimap";
+import type { BigmapCalibration, WorldXZ } from "./types";
+import type { BigmapPoiMarker, BigmapRegionLabel } from "./BigmapCanvas";
 
 export interface MinimapHudProps {
   /** 当前楼层的俯视底图 object URL（与 2D 大地图同一数据源）。 */
@@ -81,7 +81,7 @@ export function MinimapHud(props: MinimapHudProps) {
     if (canvas === null) {
       return;
     }
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext("2d");
     if (ctx === null) {
       return;
     }
@@ -92,7 +92,7 @@ export function MinimapHud(props: MinimapHudProps) {
       canvas.height = pixelSize;
     }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.fillStyle = '#080c11';
+    ctx.fillStyle = "#080c11";
     ctx.fillRect(0, 0, sizePx, sizePx);
     const image = imageRef.current;
     if (image === null || imageSize === null || calibration === null) {
@@ -121,8 +121,8 @@ export function MinimapHud(props: MinimapHudProps) {
     const toCanvas = (world: WorldXZ) => worldToMinimapCanvas(world, calibration, view, sizePx);
 
     // 区域名层（m_RegionLayerRoot）。
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
     ctx.font = '600 10px "PingFang SC", "Microsoft YaHei", system-ui, sans-serif';
     for (const region of regions) {
       const point = toCanvas(region.world);
@@ -130,9 +130,9 @@ export function MinimapHud(props: MinimapHudProps) {
         continue;
       }
       ctx.lineWidth = 2.5;
-      ctx.strokeStyle = 'rgba(5, 8, 12, 0.85)';
+      ctx.strokeStyle = "rgba(5, 8, 12, 0.85)";
       ctx.strokeText(region.name, point.x, point.y);
-      ctx.fillStyle = 'rgba(219, 231, 243, 0.9)';
+      ctx.fillStyle = "rgba(219, 231, 243, 0.9)";
       ctx.fillText(region.name, point.x, point.y);
     }
 
@@ -144,10 +144,10 @@ export function MinimapHud(props: MinimapHudProps) {
       }
       ctx.beginPath();
       ctx.arc(point.x, point.y, poi.selected === true ? 4.5 : 3, 0, Math.PI * 2);
-      ctx.fillStyle = poi.selected === true ? '#5aa9ff' : poi.color;
+      ctx.fillStyle = poi.selected === true ? "#5aa9ff" : poi.color;
       ctx.fill();
       ctx.lineWidth = 1;
-      ctx.strokeStyle = 'rgba(5, 8, 12, 0.9)';
+      ctx.strokeStyle = "rgba(5, 8, 12, 0.9)";
       ctx.stroke();
     }
 
@@ -167,8 +167,8 @@ export function MinimapHud(props: MinimapHudProps) {
       ctx.lineTo(0, 2.8);
       ctx.lineTo(-5, 5.5);
       ctx.closePath();
-      ctx.fillStyle = '#5aa9ff';
-      ctx.strokeStyle = 'rgba(5, 8, 12, 0.9)';
+      ctx.fillStyle = "#5aa9ff";
+      ctx.strokeStyle = "rgba(5, 8, 12, 0.9)";
       ctx.lineWidth = 1.2;
       ctx.fill();
       ctx.stroke();
@@ -179,8 +179,12 @@ export function MinimapHud(props: MinimapHudProps) {
   const coords = playerXZ !== null ? pipelineWorldDisplayCoords(playerXZ) : null;
 
   return (
-    <div className="minimap-hud" role="img" aria-label={t('minimap.title')}>
-      <canvas ref={canvasRef} className="minimap-canvas" style={{ width: sizePx, height: sizePx }} />
+    <div className="minimap-hud" role="img" aria-label={t("minimap.title")}>
+      <canvas
+        ref={canvasRef}
+        className="minimap-canvas"
+        style={{ width: sizePx, height: sizePx }}
+      />
       {coords !== null ? (
         <div className="minimap-coords">
           X {coords.x.toFixed(0)} · Z {coords.y.toFixed(0)}
@@ -207,7 +211,7 @@ export function MinimapHudContainer() {
   const hiddenCategories = usePoiFilterStore((state) => state.hiddenCategories);
   const selectedPoiId = usePoiStore((state) => state.selectedPoiId);
 
-  const loader = bundle?.loader ?? null;
+  const pkg = bundle?.pkg ?? null;
 
   // 楼层条目 + 标定 + 底图 object URL（与大地图共用 resolveFloorEntry/getIconObjectUrl）。
   const floorEntry: RawMap2dFloor | null = useMemo(() => {
@@ -218,11 +222,11 @@ export function MinimapHudContainer() {
   }, [poiData, floor]);
 
   const imageUrl = useMemo(() => {
-    if (loader === null || floorEntry === null || !loader.has(floorEntry.image)) {
+    if (pkg === null || floorEntry === null || !pkg.has(floorEntry.image)) {
       return null;
     }
-    return getIconObjectUrl(loader, floorEntry.image) ?? null;
-  }, [loader, floorEntry]);
+    return getIconObjectUrl(pkg, floorEntry.image) ?? null;
+  }, [pkg, floorEntry]);
 
   const calibration = useMemo(() => {
     return floorEntry !== null ? floorCalibrationOf(floorEntry) : null;
@@ -246,7 +250,7 @@ export function MinimapHudContainer() {
         id: poi.id,
         world: { x: poi.position.x, z: poi.position.z },
         color:
-          poiData.categories.find((category) => category.id === poi.categoryId)?.color ?? '#8fa3b8',
+          poiData.categories.find((category) => category.id === poi.categoryId)?.color ?? "#8fa3b8",
         selected: poi.id === selectedPoiId,
       }));
   }, [poiData, hiddenCategories, floor, selectedPoiId]);
@@ -262,7 +266,7 @@ export function MinimapHudContainer() {
     }));
   }, [poiData]);
 
-  if (status !== 'ready' || bigmapOpen || poiData === null || calibration === null) {
+  if (status !== "ready" || bigmapOpen || poiData === null || calibration === null) {
     return null;
   }
   return (

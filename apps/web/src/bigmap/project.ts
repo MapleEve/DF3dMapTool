@@ -1,4 +1,4 @@
-import type { BigmapCalibration, PixelPoint, UvPoint, WorldXZ } from './types';
+import type { BigmapCalibration, PixelPoint, UvPoint, WorldXZ } from "./types";
 
 /**
  * 世界坐标 → 俯视底图像素的线性投影（2D 线性映射，无瓦片、无第三方地图库）。

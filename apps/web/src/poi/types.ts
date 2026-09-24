@@ -1,12 +1,18 @@
-import type { Vec3 } from '@/common/geometry';
-import type { MapId } from '@/map/types';
+import type { Vec3 } from "@/common/geometry";
+import type { MapId } from "@/map/types";
 
 /**
  * POI 分类 ID。
  * 内置兜底集合为固定字符串；数据包分类（按类型配置派生）形如 `t<TypeId>`，
  * 因此运行时放宽为 string，内置集合仍可用字面量联合约束。
  */
-export type BuiltinPoiCategoryId = 'extract' | 'supply' | 'objective' | 'landmark' | 'hazard' | 'spawn';
+export type BuiltinPoiCategoryId =
+  | "extract"
+  | "supply"
+  | "objective"
+  | "landmark"
+  | "hazard"
+  | "spawn";
 export type PoiCategoryId = BuiltinPoiCategoryId | (string & {});
 
 /** 分类显示名的 i18n 键（对应 resources.translation.poiCategory.*）。 */

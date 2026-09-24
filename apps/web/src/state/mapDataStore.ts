@@ -1,5 +1,5 @@
-import { create } from 'zustand';
-import type { MapBundle, MapPoiData } from '@/data';
+import { create } from "zustand";
+import type { MapBundle, MapPoiData } from "@/data";
 
 /**
  * 已加载地图数据包的运行时持有层。

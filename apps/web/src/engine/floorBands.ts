@@ -32,15 +32,13 @@ export function deriveFloorBands(
   if (floorValues.length === 0) {
     return [];
   }
-  const floors = [...floorValues].sort((a, b) => a - b);
+  const floors = floorValues.toSorted((a, b) => a - b);
   if (floors.length === 1) {
     return [{ floor: floors[0], yMin: Number.NEGATIVE_INFINITY, yMax: Number.POSITIVE_INFINITY }];
   }
 
   // 每个楼层的触发体中心 Y 均值；无触发体的楼层高度未知，记为 null
-  const centerByFloor = new Map<number, number | null>(
-    floors.map((floor) => [floor, null]),
-  );
+  const centerByFloor = new Map<number, number | null>(floors.map((floor) => [floor, null]));
   const sums = new Map<number, { total: number; count: number }>();
   for (const trigger of triggers) {
     if (!centerByFloor.has(trigger.floor)) {
@@ -88,7 +86,8 @@ export function deriveFloorBands(
   const bands: FloorBand[] = [];
   for (let i = 0; i < floors.length; i += 1) {
     const yMin = i === 0 ? Number.NEGATIVE_INFINITY : (heights[i - 1] + heights[i]) / 2;
-    const yMax = i === floors.length - 1 ? Number.POSITIVE_INFINITY : (heights[i] + heights[i + 1]) / 2;
+    const yMax =
+      i === floors.length - 1 ? Number.POSITIVE_INFINITY : (heights[i] + heights[i + 1]) / 2;
     bands.push({ floor: floors[i], yMin, yMax });
   }
   return bands;

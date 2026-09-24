@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { create } from "zustand";
 
 interface SearchStoreState {
   query: string;
@@ -7,7 +7,7 @@ interface SearchStoreState {
 }
 
 export const useSearchStore = create<SearchStoreState>()((set) => ({
-  query: '',
+  query: "",
   setQuery: (query) => set({ query }),
-  clearQuery: () => set({ query: '' }),
+  clearQuery: () => set({ query: "" }),
 }));

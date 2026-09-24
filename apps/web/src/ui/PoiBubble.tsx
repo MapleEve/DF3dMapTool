@@ -1,6 +1,6 @@
-import { useTranslation } from 'react-i18next';
-import type { PoiCategory, PoiDefinition } from '@/poi/types';
-import { useNavStore } from '@/state/navStore';
+import { useTranslation } from "react-i18next";
+import type { PoiCategory, PoiDefinition } from "@/poi/types";
+import { useNavStore } from "@/state/navStore";
 
 export interface PoiBubbleProps {
   poi: PoiDefinition;
@@ -17,10 +17,10 @@ export function PoiBubble({ poi, category, iconUrl, onClose, onLocate }: PoiBubb
   // 数据包派生分类的 labelKey 不在静态 i18n 键表内，运行时按字符串查表并回退 label。
   const categoryLabel =
     category?.labelKey !== undefined
-      ? t(category.labelKey as never, { defaultValue: category.label ?? '' })
+      ? t(category.labelKey as never, { defaultValue: category.label ?? "" })
       : category?.label;
   const floorLabel =
-    poi.floor === 0 ? t('poi.allFloors') : t('floor.floorName', { floor: poi.floor });
+    poi.floor === 0 ? t("poi.allFloors") : t("floor.floorName", { floor: poi.floor });
 
   return (
     <div className="poi-bubble" role="dialog" aria-label={poi.displayName}>
@@ -36,22 +36,31 @@ export function PoiBubble({ poi, category, iconUrl, onClose, onLocate }: PoiBubb
         <div className="poi-bubble-titles">
           <strong>{poi.displayName}</strong>
           <span className="poi-bubble-meta">
-            {categoryLabel !== undefined ? <em style={{ color: category?.color }}>{categoryLabel}</em> : null}
+            {categoryLabel !== undefined ? (
+              <em style={{ color: category?.color }}>{categoryLabel}</em>
+            ) : null}
             <span>{floorLabel}</span>
           </span>
         </div>
-        <button type="button" className="poi-bubble-close" onClick={onClose} aria-label={t('poi.close')}>
+        <button
+          type="button"
+          className="poi-bubble-close"
+          onClick={onClose}
+          aria-label={t("poi.close")}
+        >
           ×
         </button>
       </header>
       {poi.description !== undefined ? (
         <p className="poi-bubble-description">{poi.description}</p>
       ) : (
-        <p className="poi-bubble-description poi-bubble-description-empty">{t('poi.noDescription')}</p>
+        <p className="poi-bubble-description poi-bubble-description-empty">
+          {t("poi.noDescription")}
+        </p>
       )}
       <footer className="poi-bubble-actions">
         <button type="button" onClick={onLocate}>
-          {t('poi.locate')}
+          {t("poi.locate")}
         </button>
         <button
           type="button"
@@ -59,7 +68,7 @@ export function PoiBubble({ poi, category, iconUrl, onClose, onLocate }: PoiBubb
             requestPath(poi.position, poi.displayName);
           }}
         >
-          {t('poi.navigate')}
+          {t("poi.navigate")}
         </button>
       </footer>
     </div>
