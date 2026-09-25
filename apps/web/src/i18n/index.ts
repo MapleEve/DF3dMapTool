@@ -49,7 +49,10 @@ function applyHtmlLangTag(language: Language): void {
 
 let initPromise: Promise<void> | null = null;
 
-/** 幂等初始化；在 main.tsx 渲染前调用，恢复持久化的语言偏好。 */
+/** 幂等初始化；在 main.tsx 渲染前调用，恢复持久化的语言偏好。
+ *  幂等语义：每次调用都把语言重新对齐到当前持久化值——bun test 跨测试文件
+ *  共享 i18next 单例，后执行的文件再次 initI18n 时由此消除前序文件切换
+ *  语言带来的执行顺序依赖；应用运行时仅 main.tsx 调用一次，行为不变。 */
 export function initI18n(): Promise<void> {
   initPromise ??= i18next
     .use(initReactI18next)
@@ -68,7 +71,7 @@ export function initI18n(): Promise<void> {
       const current = i18next.language;
       applyHtmlLangTag(isLanguage(current) ? current : DEFAULT_LANGUAGE);
     });
-  return initPromise;
+  return initPromise.then(() => changeLanguage(readStoredLanguage()));
 }
 
 export async function changeLanguage(language: Language): Promise<void> {

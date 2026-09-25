@@ -233,5 +233,9 @@ describe("语言初始化、切换与 html lang 联动", () => {
     await changeLanguage("en");
     expect(document.documentElement.lang).toBe("en");
     expect(i18next.t("sandbox2d.switchTo3d")).toBe("3D Interactive Map");
+
+    // 收尾回默认语言：bun test 跨测试文件共享 i18next 单例，不向后续文件残留 en。
+    await changeLanguage("zh");
+    expect(i18next.language).toBe("zh");
   });
 });
