@@ -17,6 +17,23 @@ export {
   type MapLoadErrorCode,
 } from "./loadMap";
 export {
+  loadCollectionData,
+  loadInteractors,
+  loadRoutes,
+  routeLoadErrorCode,
+  RoutesUnavailableError,
+  decodeRoutePoints,
+  routePointAt,
+  type CollectionData,
+  type CollectionItem,
+  type CollectionRoll,
+  type InteractorsDoc,
+  type RouteDefinition,
+  type RouteLoadErrorCode,
+  type RouteMarker,
+  type RoutesDoc,
+} from "./routes";
+export {
   floorCalibration,
   floorImageInfo,
   getIconObjectUrl,

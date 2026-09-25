@@ -2,6 +2,14 @@ import { MathUtils, Vector3 } from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import type { PerspectiveCamera } from "three";
 import type { Vec3 } from "@/common/geometry";
+import {
+  FOLLOW_BLEND_SECONDS,
+  FOLLOW_EYE_HEIGHT,
+  FOLLOW_LOOK_AHEAD_T,
+  blendPose,
+  followIndexAt,
+  followPoseAt,
+} from "./routeFollow";
 
 const clamp = MathUtils.clamp;
 
@@ -56,11 +64,27 @@ interface FlyAnimation {
   finish(completed: boolean): void;
 }
 
+/** 路线跟跑回放：相机沿点位序列按录制节奏行进（用户输入可打断）。 */
+interface RouteFollowPlayback {
+  points: Float32Array;
+  duration: number;
+  elapsed: number;
+  eyeHeight: number;
+  lookAheadT: number;
+  blendElapsed: number;
+  blendDuration: number;
+  fromPosition: Vector3;
+  fromTarget: Vector3;
+  onProgress?: (fraction: number, pointIndex: number) => void;
+  finish(completed: boolean): void;
+}
+
 export class MapCameraControls extends OrbitControls {
   readonly #limits: CameraLimits;
   readonly #spawnTarget = new Vector3();
   #spawnDistance = 200;
   #animation: FlyAnimation | null = null;
+  #routeFollow: RouteFollowPlayback | null = null;
 
   constructor(camera: PerspectiveCamera, domElement: HTMLElement, limits: CameraLimitsInput) {
     super(camera, domElement);
@@ -88,8 +112,11 @@ export class MapCameraControls extends OrbitControls {
     this.zoomSpeed = 1.0;
     this.screenSpacePanning = false;
 
-    // 用户任何输入立即打断缓动飞行
-    this.addEventListener("start", () => this.cancelFlyTo());
+    // 用户任何输入立即打断缓动飞行与路线跟跑
+    this.addEventListener("start", () => {
+      this.cancelFlyTo();
+      this.cancelRouteFollow();
+    });
     this.setFov(this.#limits.defaultFov);
   }
 
@@ -119,9 +146,13 @@ export class MapCameraControls extends OrbitControls {
 
   /**
    * 缓动飞行到目标点；distance 缺省保持当前视距。
+   * 程序化飞行（POI 定位/标注传送/F 键梯子绳索交互/回出生点）优先于跟跑回放：
+   * 起飞即打断跟跑（跟跑 promise 以 false 收尾，HUD 由上层 finishFollow 收口），
+   * 否则 update() 的跟跑分支提前返回会让飞行动画永不步进（跟跑中 F 键传送失效的回归点）。
    * 用户输入（拖拽/滚轮）会立即打断，promise 以 false 收尾。
    */
   flyTo(target: Vec3, distance?: number, durationMs = 700): Promise<boolean> {
+    this.cancelRouteFollow();
     this.cancelFlyTo();
     const fromTarget = this.target.clone();
     const fromPosition = this.perspectiveCamera.position.clone();
@@ -153,6 +184,53 @@ export class MapCameraControls extends OrbitControls {
 
   get flying(): boolean {
     return this.#animation !== null;
+  }
+
+  /**
+   * 开始路线跟跑：相机沿点位序列（管线世界系 xyz float32）按 durationSeconds
+   * 原始节奏回放；入场以 blendSeconds 从当前位姿平滑接入。
+   * 用户输入（拖拽/滚轮）立即打断，promise 以 false 收尾。
+   */
+  startRouteFollow(
+    points: Float32Array,
+    durationSeconds: number,
+    options: {
+      eyeHeight?: number;
+      lookAheadT?: number;
+      blendSeconds?: number;
+      onProgress?: (fraction: number, pointIndex: number) => void;
+    } = {},
+  ): Promise<boolean> {
+    this.cancelFlyTo();
+    this.cancelRouteFollow();
+    return new Promise<boolean>((resolve) => {
+      this.#routeFollow = {
+        points,
+        duration: Math.max(durationSeconds, 0.001),
+        elapsed: 0,
+        eyeHeight: options.eyeHeight ?? FOLLOW_EYE_HEIGHT,
+        lookAheadT: options.lookAheadT ?? FOLLOW_LOOK_AHEAD_T,
+        blendElapsed: 0,
+        blendDuration: Math.max(options.blendSeconds ?? FOLLOW_BLEND_SECONDS, 0),
+        fromPosition: this.perspectiveCamera.position.clone(),
+        fromTarget: this.target.clone(),
+        onProgress: options.onProgress,
+        finish: resolve,
+      };
+    });
+  }
+
+  /** 打断路线跟跑（用户输入/结束导航按钮）。 */
+  cancelRouteFollow(): void {
+    const playback = this.#routeFollow;
+    if (playback) {
+      this.#routeFollow = null;
+      playback.finish(false);
+    }
+  }
+
+  get routeFollowing(): boolean {
+    return this.#routeFollow !== null;
   }
 
   /** 回出生点：复位到进场取景位。 */
@@ -188,6 +266,13 @@ export class MapCameraControls extends OrbitControls {
   override update(deltaTime?: number | null): boolean {
     // OrbitControls 基类构造函数末尾会调用一次 this.update()（three r186），
     // 此时子类私有字段尚未初始化；用私有字段品牌检查保证首调安全。
+    if (#routeFollow in this) {
+      const playback = this.#routeFollow;
+      if (playback) {
+        this.#stepRouteFollow(playback, deltaTime ?? 1 / 60);
+        return true;
+      }
+    }
     if (#animation in this) {
       const animation = this.#animation;
       if (animation) {
@@ -212,6 +297,39 @@ export class MapCameraControls extends OrbitControls {
       this.#clampToWorld();
     }
     return changed;
+  }
+
+  /** 跟跑单步推进：按节奏插值点位，入场混合期从当前位姿平滑接入。 */
+  #stepRouteFollow(playback: RouteFollowPlayback, deltaTime: number): void {
+    playback.elapsed += deltaTime;
+    const fraction = clamp(playback.elapsed / playback.duration, 0, 1);
+    const pose = followPoseAt(playback.points, fraction, playback.eyeHeight, playback.lookAheadT);
+    if (playback.blendDuration > 0 && playback.blendElapsed < playback.blendDuration) {
+      playback.blendElapsed += deltaTime;
+      const blended = blendPose(
+        { position: playback.fromPosition, target: playback.fromTarget },
+        pose,
+        playback.blendElapsed / playback.blendDuration,
+      );
+      this.#applyFollowPose(blended);
+    } else {
+      this.#applyFollowPose(pose);
+    }
+    playback.onProgress?.(
+      fraction,
+      Math.round(followIndexAt(fraction, playback.points.length / 3)),
+    );
+    if (fraction >= 1) {
+      this.#routeFollow = null;
+      playback.finish(true);
+    }
+  }
+
+  /** 写入跟跑位姿（注视点/相机直接对位，保持行进视角）。 */
+  #applyFollowPose(pose: { position: Vec3; target: Vec3 }): void {
+    this.target.set(pose.target.x, pose.target.y, pose.target.z);
+    this.perspectiveCamera.position.set(pose.position.x, pose.position.y, pose.position.z);
+    this.perspectiveCamera.lookAt(this.target);
   }
 
   /** 平移注视点钳制在场景范围内；相机与注视点同步平移以保持视线几何。 */

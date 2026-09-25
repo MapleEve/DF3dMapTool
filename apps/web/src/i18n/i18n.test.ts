@@ -91,11 +91,11 @@ describe("四语言字典结构同构", () => {
     }
   });
 
-  it("键数统计：四语言各 138 个叶子键（103 基线 + toolbar 3 + sandbox2d 31 + poi.locateIn2d）", () => {
-    expect(leafPaths(zh)).toHaveLength(138);
-    expect(leafPaths(en)).toHaveLength(138);
-    expect(leafPaths(ja)).toHaveLength(138);
-    expect(leafPaths(ko)).toHaveLength(138);
+  it("键数统计：四语言各 222 个叶子键（Batch4：壳 1:1 对齐 keytips/home/settings 扩展 + 路线/物资/交互命名空间）", () => {
+    expect(leafPaths(zh)).toHaveLength(222);
+    expect(leafPaths(en)).toHaveLength(222);
+    expect(leafPaths(ja)).toHaveLength(222);
+    expect(leafPaths(ko)).toHaveLength(222);
   });
 
   it("语言枚举与选择器标签覆盖四语言", () => {

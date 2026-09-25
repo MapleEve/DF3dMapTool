@@ -46,3 +46,22 @@ export { NavMesh, NAVMESH_FORMAT, navMeshFromDoc } from "./navmesh/navmesh";
 export type { NavPath, NavPoint, NavmeshDoc } from "./navmesh/navmesh";
 export { NavPathLayer } from "./navmesh/navPathLayer";
 export { NAVMESH_ENTRY, openNavMesh } from "./navmesh/loader";
+
+// 路线系统（跟跑回放 + 3D 路线图层）
+export {
+  FOLLOW_BLEND_SECONDS,
+  FOLLOW_EYE_HEIGHT,
+  FOLLOW_LOOK_AHEAD_T,
+  blendPose,
+  clampFollowT,
+  followHeadingAt,
+  followIndexAt,
+  followPositionAt,
+  followPoseAt,
+  ziplineDurationSeconds,
+} from "./routeFollow";
+export { RouteLayer } from "./routeLayer";
+
+// F 键交互物件
+export { DEFAULT_INTERACT_RADIUS, InteractorLayer } from "./interactorLayer";
+export type { InteractorKind, NearbyInteractor } from "./interactorLayer";

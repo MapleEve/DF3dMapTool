@@ -25,6 +25,13 @@ import { useUiStore } from "@/state/uiStore";
  * 传送（标记/POI）为显式按钮动作：像素→世界逆变换 → 3D 相机飞行 + 跨层楼层同步。
  */
 export function BigmapOverlay() {
+  const poiData = useMapDataStore((state) => state.poiData);
+  // 换图（poiData 变更）经 key 重建内部态：楼层/标记/区域/缩放随新图归零，
+  // 替代“effect 内同步 setState 复位”写法（避免级联渲染）。
+  return <BigmapOverlayInner key={poiData?.mapId ?? "none"} />;
+}
+
+function BigmapOverlayInner() {
   const { t } = useTranslation();
   const setBigmapOpen = useUiStore((state) => state.setBigmapOpen);
   const cameraHud = useUiStore((state) => state.cameraHud);
@@ -44,17 +51,16 @@ export function BigmapOverlay() {
   const [marker, setMarker] = useState<WorldXZ | null>(null);
   const [selectedRegionId, setSelectedRegionId] = useState<string | null>(null);
   const [zoomStep, setZoomStep] = useState<number>(MIN_ZOOM_INDEX);
-  const [iconVersion, setIconVersion] = useState(0);
-  const iconImagesRef = useRef(new Map<string, HTMLImageElement>());
+  // 图标位图以 state 承载（解码完成即重绘；ref 不参与渲染）。
+  const [iconImages, setIconImages] = useState<ReadonlyMap<string, HTMLImageElement>>(
+    () => new Map(),
+  );
+  const requestedIconsRef = useRef<{ pkg: unknown; files: Set<string> }>({
+    pkg: null,
+    files: new Set(),
+  });
   const controllerRef = useRef<BigmapController | null>(null);
   const pkg = bundle?.pkg ?? null;
-
-  useEffect(() => {
-    setBigmapFloor(null);
-    setMarker(null);
-    setSelectedRegionId(null);
-    setZoomStep(MIN_ZOOM_INDEX);
-  }, [poiData]);
 
   // 楼层条目 + 标定 + 底图 object URL。
   const floorEntry: RawMap2dFloor | null = useMemo(() => {
@@ -83,9 +89,9 @@ export function BigmapOverlay() {
     return floorEntry !== null ? floorCalibration(floorEntry) : null;
   }, [floorEntry]);
 
-  // 2D POI：同源数据 + 分类/楼层筛选（全图概览不过滤楼层）+ hideInBigmap。
+  // 2D POI：同源数据 + 分类/楼层筛选（全图概览不过滤楼层）+ hideInBigmap；
+  // 图标位图来自 iconImages state（解码完成后重算标记触发重绘）。
   const markers: readonly BigmapPoiMarker[] = useMemo(() => {
-    void iconVersion; // 图标位图加载完成后重建标记以触发重绘。
     if (poiData === null) {
       return [];
     }
@@ -98,47 +104,50 @@ export function BigmapOverlay() {
       world: { x: poi.position.x, z: poi.position.z },
       color:
         poiData.categories.find((category) => category.id === poi.categoryId)?.color ?? "#8fa3b8",
-      icon: poi.iconFile !== undefined ? (iconImagesRef.current.get(poi.iconFile) ?? null) : null,
+      icon: poi.iconFile !== undefined ? (iconImages.get(poi.iconFile) ?? null) : null,
       selected: poi.id === selectedPoiId,
     }));
-  }, [poiData, hiddenCategories, bigmapFloor, selectedPoiId, iconVersion]);
+  }, [poiData, hiddenCategories, bigmapFloor, selectedPoiId, iconImages]);
 
-  // 预加载可见 POI 的图标位图。
+  // 预加载 POI 图标位图（去重经 requestedRef——effect 内读写 ref 合法；
+  // 解码完成写 state，触发标记重算）。
   useEffect(() => {
     if (pkg === null || poiData === null) {
       return;
     }
-    let cancelled = false;
-    const files = new Set<string>();
-    for (const poi of poiData.pois) {
-      if (poi.iconFile !== undefined && !iconImagesRef.current.has(poi.iconFile)) {
-        files.add(poi.iconFile);
-      }
+    if (requestedIconsRef.current.pkg !== pkg) {
+      requestedIconsRef.current = { pkg, files: new Set() };
     }
-    for (const file of files) {
+    const requested = requestedIconsRef.current.files;
+    for (const poi of poiData.pois) {
+      const file = poi.iconFile;
+      if (file === undefined || requested.has(file)) {
+        continue;
+      }
       const url = getIconObjectUrl(pkg, file);
       if (url === undefined) {
         continue;
       }
+      requested.add(file);
       const image = new Image();
       image.src = url;
       image
         .decode()
         .then(() => {
-          if (cancelled) {
-            return;
-          }
-          iconImagesRef.current.set(file, image);
-          setIconVersion((version) => version + 1);
+          setIconImages((prev) => {
+            if (prev.has(file)) {
+              return prev;
+            }
+            const next = new Map(prev);
+            next.set(file, image);
+            return next;
+          });
         })
         .catch(() => {
           // 图标解码失败时走色点占位。
         });
     }
-    return () => {
-      cancelled = true;
-    };
-  }, [pkg, poiData, markers]);
+  }, [pkg, poiData]);
 
   const regions = useMemo(() => {
     if (poiData === null) {
@@ -311,8 +320,8 @@ export function BigmapOverlay() {
           </button>
         </div>
         <span className="bigmap-hint">{t("bigmap.hint")}</span>
-        <button type="button" className="topbar-button" onClick={() => setBigmapOpen(false)}>
-          {t("toolbar.closeBigmap")}
+        <button type="button" className="bigmap-back" onClick={() => setBigmapOpen(false)}>
+          {t("bigmap.backToMap")}
         </button>
       </header>
       <div className="bigmap-canvas-host">

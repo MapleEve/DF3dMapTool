@@ -56,18 +56,28 @@ export function PoiBubble({ poi, category, iconUrl, onClose, onLocate }: PoiBubb
         </button>
       </header>
       {poi.description !== undefined ? (
-        <p className="poi-bubble-description">{poi.description}</p>
-      ) : (
-        <p className="poi-bubble-description poi-bubble-description-empty">
-          {t("poi.noDescription")}
-        </p>
-      )}
+        <>
+          <div className="poi-bubble-divider" />
+          <p className="poi-bubble-description">{poi.description}</p>
+        </>
+      ) : null}
       <footer className="poi-bubble-actions">
-        <button type="button" onClick={onLocate}>
-          {t("poi.locate")}
+        {/* 动作口径对齐上游详情面板：立即传送（16px 绿字）+ 开始导航（绿底黑字）。 */}
+        <button type="button" className="poi-bubble-teleport" onClick={onLocate}>
+          {t("poi.teleport")}
         </button>
         <button
           type="button"
+          className="poi-bubble-navigate"
+          onClick={() => {
+            requestPath(poi.position, poi.displayName);
+          }}
+        >
+          {t("poi.startNav")}
+        </button>
+        <button
+          type="button"
+          className="poi-bubble-crossview"
           onClick={() => {
             // 3D→2D 定位：世界坐标进共享请求通道，切到 2D 沙盘视图
             // （视图侧经站点仿射换算后居中，区域级近似位置）。
@@ -76,14 +86,6 @@ export function PoiBubble({ poi, category, iconUrl, onClose, onLocate }: PoiBubb
           }}
         >
           {t("poi.locateIn2d")}
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            requestPath(poi.position, poi.displayName);
-          }}
-        >
-          {t("poi.navigate")}
         </button>
       </footer>
     </div>

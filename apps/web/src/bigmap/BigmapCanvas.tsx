@@ -109,11 +109,16 @@ export function BigmapCanvas(props: BigmapCanvasProps) {
   } | null>(null);
   const sizeRef = useRef<{ width: number; height: number }>({ width: 0, height: 0 });
   const regionHitsRef = useRef<RegionHitBox[]>([]);
-  // 回调经 ref 转发，避免绘制闭包与命令句柄因回调身份变化反复重建。
+  // 回调经 ref 转发，避免绘制闭包与命令句柄因回调身份变化反复重建；
+  // ref 写入只在 effect 中进行（渲染期不触碰 ref），事件为异步触发、时序安全。
   const onSelectRegionRef = useRef(onSelectRegion);
-  onSelectRegionRef.current = onSelectRegion;
   const onZoomChangeRef = useRef(onZoomChange);
-  onZoomChangeRef.current = onZoomChange;
+  useEffect(() => {
+    onSelectRegionRef.current = onSelectRegion;
+  }, [onSelectRegion]);
+  useEffect(() => {
+    onZoomChangeRef.current = onZoomChange;
+  }, [onZoomChange]);
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
@@ -174,12 +179,12 @@ export function BigmapCanvas(props: BigmapCanvasProps) {
       ctx.lineWidth = 3;
       ctx.strokeStyle = "rgba(5, 8, 12, 0.85)";
       ctx.strokeText(region.name, point.x, point.y);
-      ctx.fillStyle = selected ? "#5aa9ff" : "rgba(219, 231, 243, 0.92)";
+      ctx.fillStyle = selected ? "#0ff796" : "rgba(219, 231, 243, 0.92)";
       ctx.fillText(region.name, point.x, point.y);
       if (selected) {
         ctx.beginPath();
         ctx.arc(point.x, point.y, 7, 0, Math.PI * 2);
-        ctx.strokeStyle = "#5aa9ff";
+        ctx.strokeStyle = "#0ff796";
         ctx.lineWidth = 1.5;
         ctx.stroke();
       }
@@ -197,7 +202,7 @@ export function BigmapCanvas(props: BigmapCanvasProps) {
       }
       ctx.beginPath();
       ctx.arc(point.x, point.y, half + 2, 0, Math.PI * 2);
-      ctx.fillStyle = poi.selected === true ? "#5aa9ff" : "rgba(8, 12, 17, 0.72)";
+      ctx.fillStyle = poi.selected === true ? "#0ff796" : "rgba(8, 12, 17, 0.72)";
       ctx.fill();
       ctx.lineWidth = poi.selected === true ? 2 : 1;
       ctx.strokeStyle = poi.color;
@@ -230,7 +235,7 @@ export function BigmapCanvas(props: BigmapCanvasProps) {
       ctx.lineTo(0, 3.5);
       ctx.lineTo(-6.5, 7);
       ctx.closePath();
-      ctx.fillStyle = "#5aa9ff";
+      ctx.fillStyle = "#0ff796";
       ctx.strokeStyle = "rgba(5, 8, 12, 0.9)";
       ctx.lineWidth = 1.5;
       ctx.fill();

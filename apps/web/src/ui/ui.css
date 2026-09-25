@@ -20,23 +20,7 @@
   display: none;
 }
 
-/* ---------- 加载进度 ---------- */
-
-.load-progress {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  z-index: 40;
-  background: rgba(90, 169, 255, 0.15);
-}
-
-.load-progress-fill {
-  height: 100%;
-  background: var(--accent);
-  transition: width 0.15s ease;
-}
+/* 索引/首屏批次的加载呈现移至 ui/loading（boot 屏 + 进图屏），此处只留就绪后的流式进度。 */
 
 /* ---------- 场景流式进度（就绪后的分块加载） ---------- */
 
@@ -52,7 +36,7 @@
   gap: 5px;
   min-width: 168px;
   padding: 8px 10px;
-  background: rgba(8, 12, 17, 0.88);
+  background: rgba(10, 15, 19, 0.88);
   border: 1px solid var(--panel-border);
   border-radius: 8px;
   font-size: 11px;
@@ -66,7 +50,7 @@
 
 .stream-progress-bar {
   height: 3px;
-  background: rgba(90, 169, 255, 0.15);
+  background: rgba(255, 255, 255, 0.102);
 }
 
 .stream-progress-fill {
@@ -109,7 +93,7 @@
 
 .topbar-tagline {
   font-size: 12px;
-  color: var(--text-dim);
+  color: var(--text-faint);
 }
 
 .topbar-field {
@@ -121,8 +105,8 @@
 }
 
 .topbar-field select {
-  background: #141c26;
-  border: 1px solid var(--panel-border);
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
   border-radius: 6px;
   padding: 6px 10px;
   color: var(--text);
@@ -136,18 +120,19 @@
 }
 
 .topbar-button {
-  background: #16222f;
-  border: 1px solid var(--panel-border);
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
   border-radius: 6px;
   padding: 6px 14px;
   font-size: 13px;
+  color: var(--text-dim);
   transition: border-color 0.15s ease;
 }
 
-/* 顶栏语言下拉（四语言）：沿用 topbar-field select 的控件外观。 */
+/* 顶栏语言下拉（四语言）：沿用统一控件外观。 */
 .topbar-language {
-  background: #16222f;
-  border: 1px solid var(--panel-border);
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
   border-radius: 6px;
   padding: 6px 10px;
   color: var(--text);
@@ -155,13 +140,18 @@
   transition: border-color 0.15s ease;
 }
 
-.topbar-language:hover {
+.topbar-language:hover,
+.topbar-language:focus,
+.topbar-field select:hover,
+.topbar-field select:focus {
   border-color: var(--accent);
+  outline: none;
 }
 
 .topbar-button:hover,
 .topbar-button.active {
   border-color: var(--accent);
+  color: var(--text);
 }
 
 /* ---------- 2D/3D 沙盘视图切换 ---------- */
@@ -169,13 +159,13 @@
 .view-switch {
   display: flex;
   align-items: center;
-  border: 1px solid var(--panel-border);
+  border: 1px solid var(--input-border);
   border-radius: 6px;
   overflow: hidden;
 }
 
 .view-switch-button {
-  background: #141c26;
+  background: var(--input-bg);
   border: none;
   padding: 6px 14px;
   font-size: 13px;
@@ -189,9 +179,10 @@
   color: var(--text);
 }
 
+/* 激活态=主绿底黑字（上游 CTA 口径：绿底 #0FF796 + 黑字）。 */
 .view-switch-button.active {
   background: var(--accent);
-  color: #0b0f14;
+  color: #000000;
   font-weight: 600;
 }
 
@@ -208,8 +199,8 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  background: #141c26;
-  border: 1px solid var(--panel-border);
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
   border-radius: 999px;
   padding: 4px 12px;
   font-size: 12px;
@@ -226,12 +217,13 @@
 
 .map-switcher-chip.active {
   border-color: var(--accent);
-  color: var(--text);
-  background: #16222f;
+  color: var(--accent);
+  background: var(--input-bg);
 }
 
 .map-switcher-chip.preparing {
   opacity: 0.55;
+  cursor: default;
 }
 
 .map-switcher-id {
@@ -245,9 +237,9 @@
   align-items: center;
   gap: 8px;
   font-size: 12px;
-  color: #f5c542;
-  background: rgba(245, 197, 66, 0.1);
-  border: 1px solid rgba(245, 197, 66, 0.4);
+  color: var(--yellow);
+  background: rgba(255, 218, 116, 0.08);
+  border: 1px solid rgba(255, 218, 116, 0.4);
   border-radius: 6px;
   padding: 4px 10px;
 }
@@ -256,9 +248,13 @@
   font-size: 12px;
   color: var(--text);
   background: transparent;
-  border: 1px solid var(--panel-border);
+  border: 1px solid var(--input-border);
   border-radius: 4px;
   padding: 1px 8px;
+}
+
+.map-switcher-notice button:hover {
+  border-color: var(--yellow);
 }
 
 /* ---------- 侧栏 ---------- */
@@ -271,15 +267,15 @@
   z-index: 15;
   width: 280px;
   padding: 16px;
-  background: var(--panel);
+  background: #191e22;
   border-right: 1px solid var(--panel-border);
-  backdrop-filter: blur(6px);
   overflow-y: auto;
+  scrollbar-color: #586669 #171c1c;
 }
 
 .sidebar-title {
   margin: 0 0 12px;
-  font-size: 15px;
+  font-size: 16px;
 }
 
 .sidebar-search {
@@ -288,22 +284,47 @@
   margin-bottom: 12px;
 }
 
+/* 搜索框：上游 POI 面板口径（底 #0F1316、占位白@0.5、高 48）。 */
 .sidebar-search input {
   flex: 1;
-  background: #141c26;
-  border: 1px solid var(--panel-border);
+  height: 44px;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
   border-radius: 6px;
-  padding: 7px 10px;
+  padding: 0 12px;
   font-size: 13px;
+  color: var(--text);
+  caret-color: var(--accent);
 }
 
+.sidebar-search input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.sidebar-search input::placeholder {
+  color: var(--text-faint);
+}
+
+/* 全选/全不选：绿色强调文字按钮（原面板「重置/筛选」绿字口径）。 */
 .sidebar-search button,
 .sidebar-category-actions button {
-  background: #16222f;
-  border: 1px solid var(--panel-border);
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
   border-radius: 6px;
   padding: 6px 10px;
   font-size: 12px;
+  color: var(--accent);
+}
+
+.sidebar-search button:disabled {
+  color: var(--text-faint);
+  cursor: not-allowed;
+}
+
+.sidebar-search button:not(:disabled):hover,
+.sidebar-category-actions button:hover {
+  border-color: var(--accent);
 }
 
 .sidebar-result-count {
@@ -321,6 +342,7 @@
   gap: 4px;
   max-height: 260px;
   overflow-y: auto;
+  scrollbar-color: #586669 #171c1c;
 }
 
 .sidebar-result {
@@ -334,10 +356,11 @@
   border: 1px solid transparent;
   border-radius: 6px;
   padding: 6px 8px;
+  color: var(--text);
 }
 
 .sidebar-result:hover {
-  background: #141c26;
+  background: rgba(255, 255, 255, 0.05);
   border-color: var(--panel-border);
 }
 
@@ -354,7 +377,7 @@
 
 .sidebar-result-floor {
   font-size: 11px;
-  color: var(--text-dim);
+  color: var(--text-faint);
 }
 
 .sidebar-result-empty {
@@ -389,8 +412,22 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: 14px;
+  color: var(--text);
   cursor: pointer;
+}
+
+/* 隐藏分类=次级淡化（白@0.502），选中分类=白（原列表 typeName 14px@0.6 / 白）。 */
+.sidebar-category.is-hidden {
+  color: var(--text-faint);
+}
+
+.sidebar-category:hover {
+  color: var(--accent);
+}
+
+.sidebar-category input {
+  accent-color: var(--accent);
 }
 
 .sidebar-category-dot {
@@ -453,17 +490,19 @@
   position: absolute;
   top: 0;
   left: 0;
-  width: 264px;
+  width: 240px;
   pointer-events: auto;
   will-change: transform;
 }
 
+/* POI 气泡=上游详情面板口径：240 宽、底 #0D1213@0.902、
+ * 名称 16px 绿、副标题 12px 白、分隔线白@0.102。 */
 .poi-bubble {
-  margin-top: 16px;
-  background: var(--panel);
+  margin-top: 12px;
+  background: rgba(13, 18, 19, 0.902);
   border: 1px solid var(--panel-border);
-  border-radius: 10px;
-  padding: 12px;
+  border-radius: 8px;
+  padding: 14px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
   backdrop-filter: blur(8px);
 }
@@ -475,8 +514,8 @@
 }
 
 .poi-bubble-icon {
-  width: 40px;
-  height: 40px;
+  width: 42px;
+  height: 42px;
   object-fit: contain;
   flex: none;
 }
@@ -494,17 +533,20 @@
   min-width: 0;
 }
 
+/* 名称：16px 主绿（DetailPanel name）。 */
 .poi-bubble-titles strong {
-  font-size: 14px;
+  font-size: 16px;
   line-height: 1.3;
+  color: var(--accent);
 }
 
+/* 副标题/楼层：12px 白。 */
 .poi-bubble-meta {
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: 12px;
-  color: var(--text-dim);
+  color: var(--text);
 }
 
 .poi-bubble-meta em {
@@ -524,35 +566,166 @@
   color: var(--text);
 }
 
+.poi-bubble-divider {
+  height: 1px;
+  margin: 10px 0;
+  background: var(--panel-border);
+}
+
 .poi-bubble-description {
-  margin: 10px 0 0;
+  margin: 0;
   font-size: 12px;
   line-height: 1.6;
   color: var(--text-dim);
 }
 
 .poi-bubble-description-empty {
-  opacity: 0.7;
+  color: var(--text-faint);
 }
 
+/* 动作区：立即传送（绿字描边钮 216x44）+ 开始导航（绿底黑字）。 */
 .poi-bubble-actions {
-  margin-top: 10px;
+  margin-top: 12px;
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  justify-content: flex-end;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.poi-bubble-actions button {
-  background: #16222f;
-  border: 1px solid var(--panel-border);
+.poi-bubble-teleport {
+  height: 44px;
+  background: var(--input-bg);
+  border: 1px solid rgba(15, 247, 150, 0.5);
   border-radius: 6px;
-  padding: 5px 14px;
-  font-size: 12px;
+  font-size: 16px;
+  color: var(--accent);
+  transition: background 0.15s ease;
 }
 
-.poi-bubble-actions button:hover {
-  border-color: var(--accent);
+.poi-bubble-teleport:hover {
+  background: rgba(15, 247, 150, 0.12);
+}
+
+.poi-bubble-navigate {
+  height: 44px;
+  background: var(--accent);
+  border: none;
+  border-radius: 6px;
+  font-size: 16px;
+  color: #000000;
+  font-weight: 600;
+  transition: filter 0.15s ease;
+}
+
+.poi-bubble-navigate:hover {
+  filter: brightness(1.1);
+}
+
+/* 跨视图定位：次级绿色文字链接（backBigMapBtn 18px 绿口径，紧凑降级）。 */
+.poi-bubble-crossview {
+  margin-top: 4px;
+  background: none;
+  border: none;
+  padding: 2px 0;
+  font-size: 12px;
+  color: var(--accent);
+  text-align: center;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.poi-bubble-crossview:hover {
+  filter: brightness(1.15);
+}
+
+/* ---------- 操作说明面板（上游 HUD 实测口径：右下角，Tab 显隐） ---------- */
+
+.keytips {
+  position: absolute;
+  right: 14px;
+  /* 小地图 HUD（172px 画布 + 坐标行 + 内边距）上方 12px。 */
+  bottom: 262px;
+  z-index: 15;
+  width: 240px;
+  border: 1px solid #585758;
+  border-radius: 6px;
+  background: #0a0f11;
+  padding: 0 0 4px;
+  overflow: hidden;
+}
+
+.keytips-title {
+  margin: 0;
+  padding: 8px 16px 6px;
+  font-size: 16px;
+  color: var(--text);
+}
+
+.keytips-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* 行 240x30：键名 14px 白 + 说明 14px 白。 */
+.keytips-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 30px;
+  padding: 0 16px;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.keytips-key {
+  flex: none;
+  min-width: 64px;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.keytips-desc {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+/* Tab 折叠钮：12px 白@0.698。 */
+.keytips-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  width: 100%;
+  height: 24px;
+  padding: 0 12px;
+  margin-top: 2px;
+  background: transparent;
+  border: none;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.keytips-toggle:hover {
+  color: var(--accent);
+}
+
+/* 折叠态：仅保留折叠钮（显示操作说明）。 */
+.keytips-collapsed {
+  position: absolute;
+  right: 14px;
+  bottom: 262px;
+  z-index: 15;
+  background: transparent;
+  border: none;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.keytips-collapsed:hover {
+  color: var(--accent);
 }
 
 /* ---------- 2D 大地图 ---------- */
@@ -563,7 +736,7 @@
   z-index: 30;
   display: flex;
   flex-direction: column;
-  background: rgba(8, 12, 17, 0.96);
+  background: rgba(10, 15, 19, 0.96);
 }
 
 .bigmap-header {
@@ -575,49 +748,64 @@
   flex-wrap: wrap;
 }
 
+/* 地图名 36px 白（上游 POI 面板实测口径）。 */
 .bigmap-header h2 {
   margin: 0;
-  font-size: 16px;
+  font-size: 36px;
+  line-height: 1.15;
 }
 
 .bigmap-hint {
   flex: 1;
-  font-size: 12px;
-  color: var(--text-dim);
+  font-size: 14px;
+  color: #c2ba43;
   min-width: 200px;
 }
 
 .bigmap-floor-list {
   display: flex;
   gap: 6px;
+  flex-wrap: wrap;
 }
 
+/* 楼层切换：20px #FFDA74（原 ChangeFloor 口径）。 */
 .bigmap-floor {
-  background: #141c26;
-  border: 1px solid var(--panel-border);
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
   border-radius: 6px;
-  padding: 5px 12px;
-  font-size: 12px;
-  color: var(--text-dim);
+  padding: 6px 14px;
+  font-size: 16px;
+  color: var(--yellow);
+}
+
+.bigmap-floor:hover {
+  border-color: var(--yellow);
 }
 
 .bigmap-floor.active {
-  border-color: var(--accent);
-  color: var(--text);
+  border-color: var(--yellow);
+  background: rgba(255, 218, 116, 0.1);
 }
 
 .bigmap-zoom-controls {
   display: flex;
   gap: 6px;
+  align-items: center;
 }
 
 .bigmap-zoom-controls button {
   min-width: 32px;
-  background: #16222f;
-  border: 1px solid var(--panel-border);
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
   border-radius: 6px;
   padding: 5px 10px;
   font-size: 13px;
+  color: var(--text-dim);
+}
+
+.bigmap-zoom-controls button:hover {
+  border-color: var(--accent);
+  color: var(--text);
 }
 
 .bigmap-canvas-host {
@@ -661,20 +849,37 @@
 }
 
 .bigmap-teleport-actions button {
-  background: #16222f;
-  border: 1px solid var(--panel-border);
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
   border-radius: 6px;
   padding: 5px 12px;
   font-size: 12px;
+  color: var(--accent);
 }
 
 .bigmap-teleport-actions button:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+  color: var(--text-faint);
 }
 
 .bigmap-teleport-actions button:not(:disabled):hover {
   border-color: var(--accent);
+}
+
+/* 返回地图：绿底黑字（原 btnBack 351x72 黑字口径，紧凑降级）。 */
+.bigmap-back {
+  background: var(--accent);
+  border: none;
+  border-radius: 6px;
+  padding: 10px 24px;
+  font-size: 20px;
+  font-weight: 600;
+  color: #000000;
+}
+
+.bigmap-back:hover {
+  filter: brightness(1.1);
 }
 
 .bigmap-region-bar {
@@ -691,7 +896,7 @@
   right: 14px;
   bottom: 44px;
   z-index: 15;
-  background: rgba(8, 12, 17, 0.88);
+  background: rgba(10, 15, 19, 0.88);
   border: 1px solid var(--panel-border);
   border-radius: 8px;
   padding: 6px;
@@ -755,8 +960,8 @@
 }
 
 .status-actions button {
-  background: #16222f;
-  border: 1px solid var(--panel-border);
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
   border-radius: 6px;
   padding: 3px 10px;
   font-size: 12px;
@@ -773,7 +978,7 @@
   cursor: default;
 }
 
-/* ---------- 设置面板 ---------- */
+/* ---------- 设置模态（上游 Esc 设置菜单结构） ---------- */
 
 .settings-backdrop {
   position: absolute;
@@ -785,121 +990,331 @@
   background: rgba(4, 6, 10, 0.55);
 }
 
-.settings-panel {
-  width: 340px;
-  background: var(--panel);
+/* 面板：settingList 1110x784 口径（视口内自适应）。 */
+.settings-root {
+  position: relative;
+  width: min(1110px, 94vw);
+  height: min(784px, 88vh);
+  display: flex;
+  flex-direction: column;
+  background: #0c1317;
   border: 1px solid var(--panel-border);
-  border-radius: 12px;
-  padding: 16px 20px 20px;
+  border-radius: 10px;
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+
+/* 「设置」水印：80px 白@0.102。 */
+.settings-watermark {
+  position: absolute;
+  top: 8px;
+  left: 32px;
+  margin: 0;
+  font-size: 80px;
+  line-height: 1;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.102);
+  pointer-events: none;
+  user-select: none;
 }
 
 .settings-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 14px;
+  gap: 24px;
+  padding: 20px 32px 0 210px;
 }
 
-.settings-header h2 {
-  margin: 0;
-  font-size: 15px;
+/* 页签：参数设置 36px（页签组 262x48）。 */
+.settings-tabs {
+  display: flex;
+  gap: 8px;
 }
 
-.settings-header button {
+.settings-tab {
+  min-width: 262px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: transparent;
   border: none;
-  color: var(--text-dim);
-  font-size: 18px;
+  border-bottom: 3px solid transparent;
+  font-size: 36px;
+  line-height: 1;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+
+.settings-tab.active {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+
+/* 重置：16px 白（txtBtnReset 口径），右置（原 x≈1030）。 */
+.settings-reset {
+  margin-left: auto;
+  background: transparent;
+  border: 1px solid var(--input-border);
+  border-radius: 6px;
+  padding: 8px 18px;
+  font-size: 16px;
+  color: var(--text);
+}
+
+.settings-reset:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* 参数列表：行距 54px（参数行 1050x54），列表底 #202A33@0.902。 */
+.settings-list {
+  flex: 1;
+  margin: 20px 32px 0;
+  background: rgba(32, 42, 51, 0.902);
+  border-radius: 6px;
+  overflow-y: auto;
+  scrollbar-color: #586669 #171c1c;
+}
+
+.settings-list-inner {
+  padding: 0 30px;
 }
 
 .settings-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  gap: 16px;
+  min-height: 54px;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.102);
+}
+
+.settings-row:last-child {
+  border-bottom: none;
+}
+
+/* 标签 16px 白 + 说明列 16px@0.502（原 desc 列口径）。 */
+.settings-row-label {
+  width: 260px;
+  flex: none;
+  font-size: 16px;
+  color: var(--text);
+}
+
+.settings-row-control {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 16px;
+}
+
+.settings-row-desc {
+  width: 320px;
+  flex: none;
   font-size: 13px;
-  margin-bottom: 10px;
+  line-height: 1.5;
+  color: var(--text-faint);
+}
+
+.settings-slider-value {
+  min-width: 86px;
+  text-align: right;
+  font-size: 16px;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 滑杆 374x22（Fill 白@0.698 / Handle #BDC2C5 / 底 白@0.2）。 */
+.settings-row input[type="range"] {
+  width: min(374px, 40%);
+  height: 22px;
+  margin: 0;
+  accent-color: var(--accent);
 }
 
 .settings-row select {
-  background: #141c26;
-  border: 1px solid var(--panel-border);
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
   border-radius: 6px;
-  padding: 6px 10px;
+  padding: 8px 12px;
+  font-size: 14px;
   color: var(--text);
   min-width: 120px;
 }
 
-.settings-hint {
-  margin: 0 0 12px;
-  font-size: 11px;
-  color: var(--text-dim);
-  line-height: 1.5;
+.settings-row select:hover,
+.settings-row select:focus {
+  border-color: var(--accent);
+  outline: none;
 }
 
-.settings-tabs {
-  display: flex;
-  gap: 6px;
-  margin-bottom: 14px;
-  border-bottom: 1px solid var(--panel-border);
-  padding-bottom: 10px;
-}
-
-.settings-tab {
-  flex: 1;
-  background: transparent;
-  border: 1px solid var(--panel-border);
-  border-radius: 6px;
-  padding: 6px 0;
-  color: var(--text-dim);
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.settings-tab.active {
-  background: #1b2735;
-  border-color: #3d5a80;
-  color: var(--text);
-}
-
+/* 参数行开关：prefab ui_setting.json toggle RectTransform 148x56。 */
 .settings-switch {
-  background: #141c26;
-  border: 1px solid var(--panel-border);
+  min-width: 148px;
+  height: 56px;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
   border-radius: 999px;
-  padding: 5px 14px;
-  color: var(--text-dim);
-  font-size: 12px;
-  min-width: 56px;
+  padding: 0 20px;
+  color: var(--text-faint);
+  font-size: 16px;
   cursor: pointer;
 }
 
 .settings-switch.on {
-  background: #16324a;
-  border-color: #3d7ea8;
-  color: #cfe8ff;
+  background: rgba(15, 247, 150, 0.12);
+  border-color: rgba(15, 247, 150, 0.6);
+  color: var(--accent);
 }
 
 .settings-action {
-  background: #1b2735;
-  border: 1px solid #3d5a80;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
   border-radius: 6px;
-  padding: 6px 14px;
+  padding: 8px 16px;
+  font-size: 14px;
   color: var(--text);
-  font-size: 12px;
   cursor: pointer;
 }
 
-.settings-slider-value {
-  font-size: 12px;
-  color: var(--text);
-  font-variant-numeric: tabular-nums;
+.settings-action:hover {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
-.settings-row input[type="range"] {
-  width: 100%;
-  margin: 0 0 12px;
-  accent-color: #4a90d9;
+/* 底栏：返回（16px 白@0.698）+ 切换地图（240x64 黑字）+ 退出工具（绿字）。 */
+.settings-footer {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 32px 20px;
+}
+
+.settings-back {
+  background: transparent;
+  border: none;
+  padding: 8px 4px;
+  font-size: 16px;
+  color: var(--text-dim);
+}
+
+.settings-back:hover {
+  color: var(--text);
+}
+
+.settings-footer-spacer {
+  flex: 1;
+}
+
+.settings-switch-map {
+  width: 240px;
+  height: 64px;
+  background: var(--accent);
+  border: none;
+  border-radius: 6px;
+  font-size: 24px;
+  font-weight: 600;
+  color: #000000;
+}
+
+.settings-switch-map:hover {
+  filter: brightness(1.1);
+}
+
+.settings-exit {
+  width: 240px;
+  height: 64px;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: 6px;
+  font-size: 24px;
+  color: var(--accent);
+}
+
+.settings-exit:hover {
+  border-color: var(--accent);
+}
+
+/* 重置确认 toast（UIToast prefab 几何：面板 440x264；txtTitle 顶距 48/盒高 42.3/28px；
+ * txtContent 顶距 100.4/盒高 64.3（两行 24px #B5B7B8）；底部按钮条 440x70.1 距底 22；
+ * btnConfirm/btnCancel 180x64，确定 24px 绿字 / 取消 24px 黑字）。 */
+.settings-toast {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(4, 6, 10, 0.55);
+}
+
+.settings-toast-panel {
+  box-sizing: border-box;
+  width: min(440px, 90%);
+  height: 264px;
+  padding: 48px 18px 22px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: #0c1317;
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  text-align: center;
+}
+
+.settings-toast-title {
+  margin: 0 0 10px;
+  font-size: 28px;
+  line-height: 42px;
+  color: var(--text);
+}
+
+.settings-toast-body {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.35;
+  color: #b5b7b8;
+}
+
+.settings-toast-actions {
+  margin-top: auto;
+  height: 70px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+
+/* 确定=绿字（深底），取消=黑字（绿底）——与上游实测文字色一致。 */
+.settings-toast-confirm {
+  width: 180px;
+  height: 64px;
+  background: var(--input-bg);
+  border: 1px solid rgba(15, 247, 150, 0.5);
+  border-radius: 6px;
+  font-size: 24px;
+  color: var(--accent);
+}
+
+.settings-toast-confirm:hover {
+  background: rgba(15, 247, 150, 0.12);
+}
+
+.settings-toast-cancel {
+  width: 180px;
+  height: 64px;
+  background: var(--accent);
+  border: none;
+  border-radius: 6px;
+  font-size: 24px;
+  font-weight: 600;
+  color: #000000;
+}
+
+.settings-toast-cancel:hover {
+  filter: brightness(1.1);
 }
 
 /* ---------- 寻路 HUD ---------- */
@@ -910,7 +1325,7 @@
   right: 12px;
   z-index: 30;
   width: 172px;
-  background: var(--panel);
+  background: rgba(12, 19, 23, 0.92);
   border: 1px solid var(--panel-border);
   border-radius: 10px;
   padding: 10px 12px;
@@ -936,6 +1351,10 @@
   font-size: 15px;
 }
 
+.nav-path-hud-header button:hover {
+  color: var(--text);
+}
+
 .nav-path-hud p {
   margin: 0 0 6px;
   color: var(--text-dim);
@@ -958,6 +1377,166 @@
   margin: 2px auto 0;
   background: rgba(10, 16, 24, 0.6);
   border-radius: 6px;
+}
+
+/* ---------- 选图屏（上游地图选择首屏口径） ---------- */
+
+.home-screen {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  background: #0a0f13;
+}
+
+.home-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 64px 80px 0;
+}
+
+.home-title-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.home-title {
+  margin: 0;
+  font-size: 42px;
+  line-height: 1.2;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.home-tagline {
+  margin: 0;
+  font-size: 20px;
+  color: var(--text-dim);
+}
+
+.home-lang {
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.home-lang:hover,
+.home-lang:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.home-cards {
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 32px;
+  padding: 0 80px 48px;
+  flex-wrap: wrap;
+  align-content: flex-end;
+}
+
+.home-card {
+  position: relative;
+  width: 260px;
+  height: 160px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 16px;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: 8px;
+  text-align: left;
+  overflow: hidden;
+  transition: border-color 0.15s ease;
+}
+
+.home-card:hover {
+  border-color: var(--accent);
+}
+
+.home-card.selected {
+  border-color: var(--accent);
+  background: rgba(15, 247, 150, 0.06);
+}
+
+.home-card.preparing {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.home-card-id {
+  position: absolute;
+  top: 12px;
+  left: 14px;
+  font-size: 12px;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.home-card-name {
+  margin: 0;
+  font-size: 24px;
+  color: var(--text);
+}
+
+.home-card-status {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--accent);
+  min-height: 16px;
+}
+
+.home-card.preparing .home-card-status {
+  color: var(--text-dim);
+}
+
+.home-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 0 56px 44px;
+}
+
+/* 操作提示：32px 白@0.698（uimapdownload prefab 口径，Localization 原文含半角冒号）。 */
+.home-tip {
+  margin: 0;
+  max-width: 58vw;
+  font-size: 32px;
+  color: var(--text-dim);
+}
+
+/* 立即行动 CTA：300x84 绿底黑字 32px（原 btnConfirm 口径）。 */
+.home-cta {
+  flex: none;
+  width: 300px;
+  height: 84px;
+  background: #0ef293;
+  border: none;
+  border-radius: 8px;
+  font-size: 32px;
+  font-weight: 600;
+  color: #000000;
+  transition: filter 0.15s ease;
+}
+
+.home-cta:hover {
+  filter: brightness(1.08);
+}
+
+.home-cta:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  filter: none;
 }
 
 /* ---------- 全页 2D 沙盘视图 ---------- */
@@ -1570,4 +2149,785 @@
 
 .sandbox2d-coord-popup-close:hover {
   color: #ffffff;
+}
+
+/* ---------- 路线系统（Q 面板/跟跑/自录） ---------- */
+/* 路线面板：440x500，锚点左下 (40,40)。 */
+.route-panel {
+  position: absolute;
+  left: 40px;
+  bottom: 40px;
+  z-index: 25;
+  width: 440px;
+  height: 500px;
+  background: rgba(10, 15, 19, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.102);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+}
+
+.route-panel-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.698);
+  font-size: 16px;
+  line-height: 1;
+  z-index: 2;
+}
+
+.route-panel-close:hover {
+  color: #ffffff;
+}
+
+.route-panel-inner {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 20px 20px 16px;
+  overflow: hidden;
+}
+
+/* 标题 20px 白（titleText 30,-20 顶部左）。 */
+.route-panel-title {
+  margin: 0 0 12px;
+  font-size: 20px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+/* 路线列表 400x436（顶部 64px 起），行距 67px。 */
+.route-list {
+  flex: 1;
+  overflow-y: auto;
+  scrollbar-color: #586669 transparent;
+}
+
+.route-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 67px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.102);
+}
+
+.route-item-name {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: transparent;
+  border: none;
+  text-align: left;
+  padding: 0;
+  cursor: pointer;
+}
+
+.route-item-title {
+  font-size: 16px;
+  color: #ffffff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.route-item-stats {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.698);
+  font-variant-numeric: tabular-nums;
+}
+
+.route-item-tools {
+  display: flex;
+  gap: 4px;
+}
+
+.route-tool {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.302);
+  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.698);
+  font-size: 12px;
+  padding: 2px 8px;
+}
+
+.route-tool:hover {
+  border-color: #0ff796;
+  color: #0ff796;
+}
+
+/* 开始导航按钮：344x44 口径的紧凑形态（行内 16px 绿字）。 */
+.route-item-nav {
+  background: transparent;
+  border: 1px solid #0ff796;
+  border-radius: 4px;
+  color: #0ff796;
+  font-size: 16px;
+  padding: 8px 14px;
+  flex-shrink: 0;
+}
+
+.route-item-nav:hover {
+  background: rgba(15, 247, 150, 0.12);
+}
+
+/* 空态（goEmptyTip #272B2F@a0.502 + 20px 白）。 */
+.route-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(39, 43, 47, 0.502);
+  color: #ffffff;
+  font-size: 20px;
+  text-align: center;
+  padding: 24px;
+}
+
+.route-panel-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.route-footer-button {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.302);
+  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.698);
+  font-size: 14px;
+  padding: 5px 12px;
+}
+
+.route-footer-button:hover {
+  border-color: #0ff796;
+  color: #0ff796;
+}
+
+.route-import-input {
+  display: none;
+}
+
+.route-import-error {
+  font-size: 12px;
+  color: #ff0000;
+}
+
+/* 详情：返回行 + 标注点列表 + 开始/结束导航 344x44。 */
+.route-back {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  color: #ffffff;
+  font-size: 20px;
+  padding: 0;
+  margin-bottom: 10px;
+}
+
+.route-back-icon {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.route-back:hover {
+  color: #0ff796;
+}
+
+.route-detail-name {
+  font-size: 20px;
+  color: #ffffff;
+  margin-bottom: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.route-detail-stats {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.698);
+  margin-bottom: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.route-marker-list {
+  flex: 1;
+  overflow-y: auto;
+  scrollbar-color: #586669 transparent;
+}
+
+.route-marker-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.102);
+}
+
+.route-marker-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 20px;
+  color: #ffffff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.route-marker-teleport {
+  background: transparent;
+  border: 1px solid #0ff796;
+  border-radius: 4px;
+  color: #0ff796;
+  font-size: 16px;
+  padding: 5px 12px;
+  flex-shrink: 0;
+}
+
+.route-marker-teleport:hover {
+  background: rgba(15, 247, 150, 0.12);
+}
+
+.route-marker-empty {
+  padding: 20px 0;
+  font-size: 20px;
+  color: #ffffff;
+  text-align: center;
+  background: rgba(39, 43, 47, 0.502);
+}
+
+/* 详情底部按钮 344x44：开始=绿字、结束=黑字（绿底）。 */
+.route-nav-button {
+  margin-top: 12px;
+  width: 344px;
+  height: 44px;
+  align-self: center;
+  background: transparent;
+  border: 1px solid #0ff796;
+  border-radius: 4px;
+  color: #0ff796;
+  font-size: 16px;
+}
+
+.route-nav-button.end {
+  background: #0ff796;
+  border-color: #0ff796;
+  color: #000000;
+}
+
+.route-nav-button:hover {
+  opacity: 0.9;
+}
+
+/* 路线 HUD（左中提示列）。 */
+.route-hud {
+  position: absolute;
+  left: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 15;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.route-hud-tip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.route-hud-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 4px;
+  border: 1px solid rgba(255, 255, 255, 0.698);
+  border-radius: 3px;
+  color: #ffffff;
+  font-size: 12px;
+}
+
+.route-hud-tip-text {
+  font-size: 12px;
+  color: #ffffff;
+}
+
+.route-hud-nav {
+  color: rgba(255, 255, 255, 0.698);
+}
+
+.route-hud-marker {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-width: 320px;
+  padding: 8px 12px;
+  background: rgba(8, 12, 17, 0.88);
+  border-left: 2px solid #ffda74;
+}
+
+.route-hud-marker-name {
+  font-size: 14px;
+  color: #ffda74;
+}
+
+.route-hud-marker-desc {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.698);
+}
+
+/* F 键交互提示（类型名 25px@0.698 + 使用 32px@0.698，画面中央）。 */
+.interact-tip {
+  position: absolute;
+  left: 50%;
+  top: 58%;
+  transform: translateX(-50%);
+  z-index: 15;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.interact-tip-type {
+  font-size: 25px;
+  color: rgba(255, 255, 255, 0.698);
+}
+
+.interact-tip-use {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 32px;
+  color: rgba(255, 255, 255, 0.698);
+}
+
+.interact-tip-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 2px solid rgba(255, 255, 255, 0.698);
+  border-radius: 6px;
+  font-size: 20px;
+}
+
+/* 自录面板（300x550 右侧锚点）。 */
+.route-record-panel {
+  position: absolute;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 25;
+  width: 300px;
+  padding: 18px 16px;
+  background: rgba(10, 15, 19, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.102);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+.route-record-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.route-record-dot {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #ff1717;
+  flex-shrink: 0;
+}
+
+.route-record-status-text {
+  font-size: 20px;
+  color: #ffffff;
+}
+
+.route-record-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.route-record-row {
+  font-size: 20px;
+  color: #ffffff;
+  font-variant-numeric: tabular-nums;
+}
+
+.route-record-mode {
+  font-size: 20px;
+  color: #ffffff;
+  margin-bottom: 12px;
+}
+
+.route-record-input {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.route-record-input input {
+  width: 100%;
+  height: 40px;
+  background: rgba(255, 255, 255, 0.051);
+  border: 1px solid rgba(255, 255, 255, 0.302);
+  border-radius: 4px;
+  color: #ffffff;
+  font-size: 16px;
+  padding: 0 10px;
+}
+
+.route-record-input input::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.route-record-add-marker {
+  align-self: flex-start;
+  background: transparent;
+  border: 1px solid #0ff796;
+  border-radius: 4px;
+  color: #0ff796;
+  font-size: 16px;
+  padding: 5px 12px;
+}
+
+.route-record-warning {
+  margin: 0 0 6px;
+  font-size: 20px;
+  color: #ff0000;
+}
+
+.route-record-hint {
+  margin: 0 0 4px;
+  font-size: 20px;
+  color: #ff0000;
+}
+
+.route-record-stop-hint {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: #ffffff;
+}
+
+.route-record-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.route-record-stop {
+  flex: 1;
+  height: 44px;
+  background: #0ff796;
+  border: none;
+  border-radius: 4px;
+  color: #000000;
+  font-size: 16px;
+}
+
+.route-record-cancel {
+  height: 44px;
+  background: transparent;
+  border: 1px solid #0ff796;
+  border-radius: 4px;
+  color: #0ff796;
+  font-size: 16px;
+  padding: 0 14px;
+}
+
+/* 保存对话框（400x400 中央）。 */
+.route-save-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 45;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(4, 6, 10, 0.55);
+}
+
+.route-save-dialog {
+  width: 400px;
+  height: 400px;
+  padding: 24px;
+  background: rgba(10, 15, 19, 0.97);
+  border: 1px solid rgba(255, 255, 255, 0.102);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+}
+
+.route-save-title {
+  margin: 0 0 18px;
+  font-size: 26px;
+  color: #ffffff;
+  text-align: center;
+}
+
+.route-save-input {
+  width: 100%;
+  height: 48px;
+  margin-bottom: 12px;
+  background: rgba(255, 255, 255, 0.051);
+  border: 1px solid rgba(255, 255, 255, 0.302);
+  border-radius: 4px;
+  color: #ffffff;
+  font-size: 18px;
+  padding: 0 12px;
+}
+
+.route-save-input::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.route-save-actions {
+  margin-top: auto;
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+.route-save-button {
+  min-width: 120px;
+  height: 44px;
+  background: transparent;
+  border: 1px solid #0ff796;
+  border-radius: 4px;
+  color: #0ff796;
+  font-size: 20px;
+}
+
+.route-save-cancel {
+  min-width: 120px;
+  height: 44px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.302);
+  border-radius: 4px;
+  color: #0ff796;
+  font-size: 20px;
+}
+
+.route-save-button:hover,
+.route-save-cancel:hover {
+  background: rgba(15, 247, 150, 0.12);
+}
+
+/* ---------- 物资面板（F 键近旁物资 POI） ---------- */
+.collection-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 46;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(4, 6, 10, 0.55);
+}
+
+.collection-panel {
+  width: min(820px, 92vw);
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  background: rgba(10, 15, 19, 0.97);
+  border: 1px solid rgba(255, 255, 255, 0.102);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+}
+
+.collection-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px 10px;
+}
+
+.collection-title {
+  margin: 0;
+  font-size: 20px;
+  color: #ffffff;
+}
+
+.collection-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.collection-fav-toggle,
+.collection-refresh {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.302);
+  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.698);
+  font-size: 14px;
+  padding: 4px 12px;
+}
+
+.collection-fav-toggle.active,
+.collection-fav-toggle:hover,
+.collection-refresh:hover:not(:disabled) {
+  border-color: #0ff796;
+  color: #0ff796;
+}
+
+.collection-refresh:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.collection-close {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.698);
+  font-size: 18px;
+  line-height: 1;
+}
+
+.collection-close:hover {
+  color: #ffffff;
+}
+
+/* collections 列表 390x307 口径（居中限宽）。 */
+.collection-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 18px;
+  scrollbar-color: #586669 transparent;
+}
+
+.collection-list {
+  list-style: none;
+  margin: 0 auto;
+  padding: 0;
+  max-width: 390px;
+}
+
+.collection-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.102);
+  cursor: pointer;
+}
+
+.collection-item:hover {
+  background: rgba(255, 255, 255, 0.039);
+}
+
+.collection-item.selected {
+  background: rgba(15, 247, 150, 0.078);
+}
+
+.collection-fav {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.502);
+  font-size: 18px;
+  line-height: 1;
+}
+
+.collection-fav.on,
+.collection-fav:hover {
+  color: #ffda74;
+}
+
+.collection-item-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* 物品名 20px 白 / 副标题 12px。 */
+.collection-item-name {
+  font-size: 20px;
+  color: #ffffff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.collection-item-subtitle,
+.collection-item-quality {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.502);
+}
+
+.collection-item-detail {
+  max-width: 45%;
+}
+
+.collection-item-desc {
+  margin: 0;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.698);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.collection-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 18px;
+  color: #ffffff;
+  font-size: 20px;
+  text-align: center;
+}
+
+/* 底栏：累计价值 16px 绿 + 估值缺失注记 + RNG/无法交易。 */
+.collection-footer {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.102);
+  flex-wrap: wrap;
+}
+
+.collection-total-value {
+  font-size: 16px;
+  color: #0ff796;
+}
+
+.collection-value-note {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.502);
+}
+
+.collection-rng,
+.collection-unable-trade {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.502);
+  margin-left: auto;
+}
+
+.collection-unable-trade {
+  margin-left: 0;
 }

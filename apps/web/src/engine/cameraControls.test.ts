@@ -54,4 +54,25 @@ describe("MapCameraControls", () => {
     await expect(finished).resolves.toBe(false);
     expect(controls.flying).toBe(false);
   });
+
+  it("跟跑中 flyTo（F 键物件传送/POI 定位）打断跟跑并飞行到位", async () => {
+    // 回归：update() 在跟跑激活时提前返回，若 flyTo 不先打断跟跑，
+    // 飞行动画永不步进、promise 永不 resolve（跟跑中按 F 传送失效）。
+    const controls = createControls();
+    controls.frameBounds(BOUNDS);
+    const points = new Float32Array([0, 2, 0, 0, 2, 40, 0, 2, 80]);
+    const follow = controls.startRouteFollow(points, 60);
+    expect(controls.routeFollowing).toBe(true);
+    const target = { x: 10, y: 5, z: 20 };
+    const finished = controls.flyTo(target, 120, 200);
+    await expect(follow).resolves.toBe(false);
+    expect(controls.routeFollowing).toBe(false);
+    for (let frame = 0; frame < 30 && controls.flying; frame += 1) {
+      controls.update(1 / 60);
+    }
+    await expect(finished).resolves.toBe(true);
+    expect(controls.target.x).toBeCloseTo(target.x, 1);
+    expect(controls.target.y).toBeCloseTo(target.y, 1);
+    expect(controls.target.z).toBeCloseTo(target.z, 1);
+  });
 });

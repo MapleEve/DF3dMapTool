@@ -1,12 +1,20 @@
 :root {
   color-scheme: dark;
-  --bg: #0b0f14;
-  --panel: rgba(13, 19, 27, 0.92);
-  --panel-border: rgba(90, 130, 170, 0.25);
-  --text: #dbe7f3;
-  --text-dim: #8fa3b8;
-  --accent: #5aa9ff;
-  --danger: #ff6b6b;
+  /* 主色板（上游实测锚定）：
+   * 底 #0A0F13~#0C1317、主绿 #0FF796、白字次级 alpha 0.698/0.502、
+   * 楼层黄 #FFDA74、警示红 #FF0000。 */
+  --bg: #0a0f13;
+  --panel: rgba(12, 19, 23, 0.92);
+  --panel-border: rgba(255, 255, 255, 0.102);
+  --text: #ffffff;
+  --text-dim: rgba(255, 255, 255, 0.698);
+  --text-faint: rgba(255, 255, 255, 0.502);
+  --accent: #0ff796;
+  --danger: #ff0000;
+  --yellow: #ffda74;
+  /* 输入底与描边（与全页 2D 沙盘控件口径一致）。 */
+  --input-bg: #0f1316;
+  --input-border: #414141;
   font-family: "PingFang SC", "Microsoft YaHei", "Segoe UI", system-ui, sans-serif;
 }
 

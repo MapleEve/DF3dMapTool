@@ -116,6 +116,16 @@ export class SceneManager {
     return this.#canvas;
   }
 
+  /** 构建时的远平面（米）：渲染距离设置的复位基准。 */
+  get defaultFar(): number {
+    return this.#options.far;
+  }
+
+  /** 运行时调整雾范围（米；near 起淡、far 全隐）。 */
+  setFogSpan(near: number, far: number): void {
+    this.scene.fog = new Fog(SKY_COLOR, near, far);
+  }
+
   addLayer(layer: EngineLayer): void {
     if (this.#layers.some((existing) => existing.id === layer.id)) {
       throw new RangeError(`图层 id 重复: ${layer.id}`);

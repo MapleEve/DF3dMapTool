@@ -1,4 +1,5 @@
 import type { Vec3 } from "@/common/geometry";
+import { buildNavmeshData, type NavmeshData } from "./navmeshData";
 
 /**
  * 导航网格数据文档（数据包内中性键，管线转换产物）。
@@ -29,19 +30,7 @@ export interface NavPath {
   readonly distance: number;
 }
 
-interface Triangle {
-  readonly ia: number;
-  readonly ib: number;
-  readonly ic: number;
-  readonly a: Vec3;
-  readonly b: Vec3;
-  readonly c: Vec3;
-  readonly centroid: Vec3;
-  readonly neighbors: number[];
-}
-
-const CELL_SIZE = 32; // 点定位均匀网格边长（米）
-const EDGE_QUANT = 1000; // 共享边匹配的坐标量化精度（1/m）
+const CELL_SIZE = 32; // 与构建侧一致（navmeshData.ts）
 
 function decodeBase64Bytes(base64: string): Uint8Array {
   const raw = atob(base64);
@@ -50,19 +39,6 @@ function decodeBase64Bytes(base64: string): Uint8Array {
     bytes[i] = raw.charCodeAt(i);
   }
   return bytes;
-}
-
-function edgeKey(p: Vec3, q: Vec3): string {
-  const ax = Math.round(p.x * EDGE_QUANT);
-  const ay = Math.round(p.y * EDGE_QUANT);
-  const az = Math.round(p.z * EDGE_QUANT);
-  const bx = Math.round(q.x * EDGE_QUANT);
-  const by = Math.round(q.y * EDGE_QUANT);
-  const bz = Math.round(q.z * EDGE_QUANT);
-  // 按坐标字典序归一化方向，保证 (a,b) 与 (b,a) 同键
-  const forward = ax < bx || (ax === bx && (ay < by || (ay === by && az <= bz)));
-  const [s, t] = forward ? [p, q] : [q, p];
-  return `${s.x.toFixed(3)},${s.y.toFixed(3)},${s.z.toFixed(3)}|${t.x.toFixed(3)},${t.y.toFixed(3)},${t.z.toFixed(3)}`;
 }
 
 /** 三维点到三角形最近点（标准 Ericson 算法）。 */
@@ -195,113 +171,72 @@ class MinHeap {
 }
 
 /**
- * 导航网格：三角形邻接图 + A* 实时寻路。
- * 数据来自管线转换产物（加密容器内中性 JSON 文档）。
+ * 导航网格查询：三角形邻接图上的最近点与 A* 实时寻路。
+ * 数据为可转移 TypedArray（NavmeshData，构建见 navmeshData.ts / navmeshWorker.ts）：
+ * Worker 构建产物与本线程构建产物结构一致，查询结果一致（测试覆盖）。
  */
 export class NavMesh {
-  readonly #triangles: Triangle[] = [];
-  readonly #vertices: Float32Array;
-  readonly #cells = new Map<number, number[]>();
-  readonly #cellMinX: number;
-  readonly #cellMinZ: number;
-  readonly #cellCols: number;
+  readonly #data: NavmeshData;
 
-  constructor(vertices: Float32Array, indices: Uint32Array) {
-    this.#vertices = vertices;
-    const vertexAt = (i: number): Vec3 => ({
-      x: vertices[i * 3],
-      y: vertices[i * 3 + 1],
-      z: vertices[i * 3 + 2],
-    });
-
-    let minX = Infinity;
-    let maxX = -Infinity;
-    let minZ = Infinity;
-    let maxZ = -Infinity;
-    for (let t = 0; t < indices.length; t += 3) {
-      const ia = indices[t];
-      const ib = indices[t + 1];
-      const ic = indices[t + 2];
-      const a = vertexAt(ia);
-      const b = vertexAt(ib);
-      const c = vertexAt(ic);
-      const centroid = {
-        x: (a.x + b.x + c.x) / 3,
-        y: (a.y + b.y + c.y) / 3,
-        z: (a.z + b.z + c.z) / 3,
-      };
-      this.#triangles.push({ ia, ib, ic, a, b, c, centroid, neighbors: [] });
-      minX = Math.min(minX, a.x, b.x, c.x);
-      maxX = Math.max(maxX, a.x, b.x, c.x);
-      minZ = Math.min(minZ, a.z, b.z, c.z);
-      maxZ = Math.max(maxZ, a.z, b.z, c.z);
-    }
-
-    this.#cellMinX = minX - 1;
-    this.#cellMinZ = minZ - 1;
-    this.#cellCols = Math.max(1, Math.ceil((maxX - minX + 2) / CELL_SIZE));
-    for (let t = 0; t < this.#triangles.length; t += 1) {
-      const { a, b, c } = this.#triangles[t];
-      const cx0 = Math.floor((Math.min(a.x, b.x, c.x) - this.#cellMinX) / CELL_SIZE);
-      const cx1 = Math.floor((Math.max(a.x, b.x, c.x) - this.#cellMinX) / CELL_SIZE);
-      const cz0 = Math.floor((Math.min(a.z, b.z, c.z) - this.#cellMinZ) / CELL_SIZE);
-      const cz1 = Math.floor((Math.max(a.z, b.z, c.z) - this.#cellMinZ) / CELL_SIZE);
-      for (let cz = cz0; cz <= cz1; cz += 1) {
-        for (let cx = cx0; cx <= cx1; cx += 1) {
-          const key = cz * this.#cellCols + cx;
-          const bucket = this.#cells.get(key);
-          if (bucket === undefined) {
-            this.#cells.set(key, [t]);
-          } else {
-            bucket.push(t);
-          }
-        }
-      }
-    }
-
-    // 共享边 → 邻接（按量化坐标匹配，跨 tile 的重复顶点天然对齐）
-    const edgeMap = new Map<string, number[]>();
-    for (let t = 0; t < this.#triangles.length; t += 1) {
-      const { a, b, c } = this.#triangles[t];
-      for (const [p, q] of [
-        [a, b],
-        [b, c],
-        [c, a],
-      ] as const) {
-        const key = edgeKey(p, q);
-        const bucket = edgeMap.get(key);
-        if (bucket === undefined) {
-          edgeMap.set(key, [t]);
-        } else {
-          bucket.push(t);
-        }
-      }
-    }
-    for (const tris of edgeMap.values()) {
-      if (tris.length < 2) {
-        continue;
-      }
-      for (const t of tris) {
-        for (const other of tris) {
-          if (other !== t && !this.#triangles[t].neighbors.includes(other)) {
-            this.#triangles[t].neighbors.push(other);
-          }
-        }
-      }
-    }
+  constructor(data: NavmeshData) {
+    this.#data = data;
   }
 
   get triangleCount(): number {
-    return this.#triangles.length;
+    return this.#data.triangleCount;
+  }
+
+  #vertexAt(index: number): Vec3 {
+    return {
+      x: this.#data.vertices[index * 3],
+      y: this.#data.vertices[index * 3 + 1],
+      z: this.#data.vertices[index * 3 + 2],
+    };
+  }
+
+  #triangleVerts(t: number): { a: Vec3; b: Vec3; c: Vec3 } {
+    const d = this.#data;
+    return {
+      a: this.#vertexAt(d.triVerts[t * 3]),
+      b: this.#vertexAt(d.triVerts[t * 3 + 1]),
+      c: this.#vertexAt(d.triVerts[t * 3 + 2]),
+    };
+  }
+
+  #centroid(t: number): Vec3 {
+    const d = this.#data;
+    return { x: d.centroids[t * 3], y: d.centroids[t * 3 + 1], z: d.centroids[t * 3 + 2] };
+  }
+
+  /** 均匀网格键 → 桶（cellKeys 升序，二分查找）。 */
+  #cellBucket(key: number): number[] | null {
+    const d = this.#data;
+    let lo = 0;
+    let hi = d.cellKeys.length - 1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      const value = d.cellKeys[mid];
+      if (value === key) {
+        const start = d.cellBucketOffset[mid];
+        const end = d.cellBucketOffset[mid + 1];
+        return Array.from(d.cellBuckets.subarray(start, end));
+      }
+      if (value < key) {
+        lo = mid + 1;
+      } else {
+        hi = mid - 1;
+      }
+    }
+    return null;
   }
 
   /** 最近可走点：先查网格邻域三角形，取三维最近点。 */
   nearestPoint(p: Vec3): NavPoint | null {
-    if (this.#triangles.length === 0) {
+    if (this.#data.triangleCount === 0) {
       return null;
     }
-    const cx = Math.floor((p.x - this.#cellMinX) / CELL_SIZE);
-    const cz = Math.floor((p.z - this.#cellMinZ) / CELL_SIZE);
+    const cx = Math.floor((p.x - this.#data.cellMinX) / CELL_SIZE);
+    const cz = Math.floor((p.z - this.#data.cellMinZ) / CELL_SIZE);
     let best: NavPoint | null = null;
     let bestDist = Infinity;
     // 由近及外扩环搜索；找到结果后再查一圈避免边界遗漏
@@ -314,12 +249,12 @@ export class NavMesh {
           if (Math.max(Math.abs(dx), Math.abs(dz)) !== radius) {
             continue;
           }
-          const bucket = this.#cells.get((cz + dz) * this.#cellCols + (cx + dx));
-          if (bucket === undefined) {
+          const bucket = this.#cellBucket((cz + dz) * this.#data.cellCols + (cx + dx));
+          if (bucket === null) {
             continue;
           }
           for (const t of bucket) {
-            const { a, b, c } = this.#triangles[t];
+            const { a, b, c } = this.#triangleVerts(t);
             const point = closestPointOnTriangle(p, a, b, c);
             const d = distanceOf(p, point);
             if (d < bestDist) {
@@ -353,7 +288,7 @@ export class NavMesh {
     const gScore = new Map<number, number>([[startTri, 0]]);
     const closed = new Set<number>();
     const goalPoint = goal.point;
-    const heuristic = (tri: number): number => distanceOf(this.#triangles[tri].centroid, goalPoint);
+    const heuristic = (tri: number): number => distanceOf(this.#centroid(tri), goalPoint);
     const open = new MinHeap();
     open.push(startTri, heuristic(startTri));
 
@@ -368,17 +303,20 @@ export class NavMesh {
         break;
       }
       closed.add(current);
-      const currentTri = this.#triangles[current];
+      const currentCentroid = this.#centroid(current);
       const currentG = gScore.get(current) ?? Infinity;
-      for (const next of currentTri.neighbors) {
+      const d = this.#data;
+      const neighborStart = d.neighborsOffset[current];
+      const neighborEnd = d.neighborsOffset[current + 1];
+      for (let n = neighborStart; n < neighborEnd; n += 1) {
+        const next = d.neighbors[n];
         if (closed.has(next)) {
           continue;
         }
         // 代价 = 穿过共享边（portal）中点的路程：当前三角形中心 → 边中点 → 下一三角形中心
         const portal = this.#portalMid(current, next);
         const stepCost =
-          distanceOf(currentTri.centroid, portal) +
-          distanceOf(portal, this.#triangles[next].centroid);
+          distanceOf(currentCentroid, portal) + distanceOf(portal, this.#centroid(next));
         const tentative = currentG + stepCost;
         if (tentative < (gScore.get(next) ?? Infinity)) {
           gScore.set(next, tentative);
@@ -418,10 +356,9 @@ export class NavMesh {
 
   /** 两相邻三角形共享边（portal）中点；按顶点索引求交。 */
   #portalMid(a: number, b: number): Vec3 {
-    const ta = this.#triangles[a];
-    const tb = this.#triangles[b];
-    const av = [ta.ia, ta.ib, ta.ic];
-    const bv = [tb.ia, tb.ib, tb.ic];
+    const d = this.#data;
+    const av = [d.triVerts[a * 3], d.triVerts[a * 3 + 1], d.triVerts[a * 3 + 2]];
+    const bv = [d.triVerts[b * 3], d.triVerts[b * 3 + 1], d.triVerts[b * 3 + 2]];
     const shared: number[] = [];
     for (const p of av) {
       if (bv.includes(p) && !shared.includes(p)) {
@@ -434,28 +371,34 @@ export class NavMesh {
     if (shared.length === 1) {
       return this.#vertexAt(shared[0]);
     }
-    return midOf(ta.centroid, tb.centroid);
-  }
-
-  #vertexAt(index: number): Vec3 {
-    return {
-      x: this.#vertices[index * 3],
-      y: this.#vertices[index * 3 + 1],
-      z: this.#vertices[index * 3 + 2],
-    };
+    return midOf(this.#centroid(a), this.#centroid(b));
   }
 }
 
-/** 解析导航网格数据文档；格式不符或数据为空返回 null。 */
+/** 解析导航网格数据文档（主线程同步构建）；格式不符或数据为空返回 null。 */
 export function navMeshFromDoc(doc: NavmeshDoc): NavMesh | null {
   if (doc.format !== NAVMESH_FORMAT) {
     throw new RangeError(`导航数据 format 应为 ${NAVMESH_FORMAT}`);
   }
-  const vertexBytes = decodeBase64Bytes(doc.vertexData);
-  const polygonBytes = decodeBase64Bytes(doc.polygonData);
-  if (vertexBytes.length === 0 || polygonBytes.length === 0) {
+  const { vertices, indices } = decodeNavmeshDoc(doc);
+  if (vertices.length === 0 || indices.length === 0) {
     return null;
   }
+  for (let i = 0; i < indices.length; i += 1) {
+    if (indices[i] >= vertices.length / 3) {
+      throw new RangeError(`导航数据顶点索引越界: ${indices[i]}`);
+    }
+  }
+  return new NavMesh(buildNavmeshData(vertices, indices));
+}
+
+/** 文档 base64 载荷 → 顶点/索引 TypedArray（Worker 与主线程共用）。 */
+export function decodeNavmeshDoc(doc: NavmeshDoc): {
+  vertices: Float32Array;
+  indices: Uint32Array;
+} {
+  const vertexBytes = decodeBase64Bytes(doc.vertexData);
+  const polygonBytes = decodeBase64Bytes(doc.polygonData);
   const vertices = new Float32Array(
     vertexBytes.buffer,
     vertexBytes.byteOffset,
@@ -466,10 +409,8 @@ export function navMeshFromDoc(doc: NavmeshDoc): NavMesh | null {
     polygonBytes.byteOffset,
     polygonBytes.byteLength / 4,
   );
-  for (let i = 0; i < indices.length; i += 1) {
-    if (indices[i] >= vertices.length / 3) {
-      throw new RangeError(`导航数据顶点索引越界: ${indices[i]}`);
-    }
-  }
-  return new NavMesh(vertices, indices);
+  return { vertices, indices };
 }
+
+export type { NavmeshData };
+export { buildNavmeshData };

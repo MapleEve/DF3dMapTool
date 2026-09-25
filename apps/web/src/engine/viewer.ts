@@ -15,6 +15,10 @@ import { SceneManager } from "./SceneManager";
 import { NavPathLayer } from "./navmesh/navPathLayer";
 import { openNavMesh } from "./navmesh/loader";
 import type { NavMesh, NavPath } from "./navmesh/navmesh";
+import { InteractorLayer, type NearbyInteractor } from "./interactorLayer";
+import { RouteLayer } from "./routeLayer";
+import { ziplineDurationSeconds } from "./routeFollow";
+import type { InteractorsDoc } from "@/data/routes";
 
 const CAMERA_LAYER_ID = "camera-controls";
 
@@ -57,6 +61,10 @@ export class MapViewer {
   #navMesh: NavMesh | null = null;
   #navMeshPromise: Promise<NavMesh | null> | null = null;
   #navPathLayer: NavPathLayer | null = null;
+  #routeLayer: RouteLayer | null = null;
+  #interactorLayer: InteractorLayer | null = null;
+  /** 视野渲染距离（米）；null = 未设置（沿用 SceneManager 默认 far/雾）。 */
+  #renderDistance: number | null = null;
 
   constructor(canvas: HTMLCanvasElement, options: MapViewerOptions = {}) {
     this.#manager = new SceneManager(canvas, {
@@ -117,11 +125,14 @@ export class MapViewer {
     this.#mapCode = definition.code;
 
     // 相机控制先于地图图层每帧更新：阻尼/飞行/钳制后的相机状态
-    // 再参与流式规划，避免视锥滞后一帧
+    // 再参与流式规划，避免视锥滞后一帧；渲染距离的远平面/雾随视距逐帧自适应。
     this.#manager.addLayer({
       id: CAMERA_LAYER_ID,
       root: new Group(),
-      update: (deltaSeconds) => this.#controls?.update(deltaSeconds),
+      update: (deltaSeconds) => {
+        this.#controls?.update(deltaSeconds);
+        this.#refreshRenderDistancePerFrame();
+      },
       dispose: () => {},
     });
 
@@ -156,9 +167,21 @@ export class MapViewer {
       this.#manager.removeLayer(this.#navPathLayer.id);
       this.#navPathLayer = null;
     }
+    this.#routeLayer?.setRoute(null);
+    if (this.#routeLayer !== null) {
+      this.#manager.removeLayer(this.#routeLayer.id);
+      this.#routeLayer = null;
+    }
+    this.#interactorLayer?.setInteractors(null);
+    if (this.#interactorLayer !== null) {
+      this.#manager.removeLayer(this.#interactorLayer.id);
+      this.#interactorLayer = null;
+    }
     this.#navMesh = null;
     this.#navMeshPromise = null;
     this.#mapCode = null;
+    this.#controls?.cancelRouteFollow();
+    this.#controls?.cancelFlyTo();
     this.#controls?.dispose();
     this.#controls = null;
     this.#pkg?.dispose();
@@ -185,20 +208,158 @@ export class MapViewer {
   }
 
   /**
-   * 应用相机设置（FOV/灵敏度，设置面板暴露项）。
-   * 地图未就绪（controls 尚未创建）时安全忽略；换图后由调用方再次应用。
+   * 应用相机设置（FOV/灵敏度/视野渲染距离，设置面板暴露项）。
+   * 地图未就绪（controls 尚未创建）时 FOV/灵敏度安全忽略；
+   * 渲染距离立即写入（远平面/雾随当前视距自适应，见 applyRenderDistance）。
    */
-  applyCameraSettings(settings: { readonly fov?: number; readonly sensitivity?: number }): void {
+  applyCameraSettings(settings: {
+    readonly fov?: number;
+    readonly sensitivity?: number;
+    readonly renderDistance?: number;
+  }): void {
+    const controls = this.#controls;
+    if (controls !== null) {
+      if (settings.fov !== undefined) {
+        controls.setFov(settings.fov);
+      }
+      if (settings.sensitivity !== undefined) {
+        controls.setSensitivity(settings.sensitivity);
+      }
+    }
+    if (settings.renderDistance !== undefined) {
+      this.setRenderDistance(settings.renderDistance);
+    }
+  }
+
+  /**
+   * 视野渲染距离（米）：控制相机远平面与雾的可见范围。
+   * 取 max(渲染距离, 当前视距×1.25)——俯瞰拉远时远平面随之扩展，
+   * 保证注视点周边始终可见（轨道视角下的忠实适配；近距视角则按设置值收敛视野）。
+   */
+  setRenderDistance(meters: number): void {
+    this.#renderDistance = meters > 0 ? meters : null;
+    this.#applyRenderDistance();
+  }
+
+  #applyRenderDistance(): void {
+    const manager = this.#manager;
+    const base = this.#renderDistance;
+    if (base === null) {
+      manager.camera.far = manager.defaultFar;
+      manager.camera.updateProjectionMatrix();
+      manager.setFogSpan(manager.defaultFar * 0.3, manager.defaultFar * 0.9);
+      return;
+    }
+    const orbit = this.#controls?.getDistance() ?? 0;
+    const far = Math.max(base, orbit * 1.25);
+    manager.camera.far = far;
+    manager.camera.updateProjectionMatrix();
+    manager.setFogSpan(far * 0.55, far * 0.95);
+  }
+
+  /** 每帧刷新渲染距离（视距变化时远平面自适应）；由相机控制层 update 回调驱动。 */
+  #refreshRenderDistancePerFrame(): void {
+    if (this.#renderDistance === null) {
+      return;
+    }
+    const orbit = this.#controls?.getDistance() ?? 0;
+    const far = Math.max(this.#renderDistance, orbit * 1.25);
+    const manager = this.#manager;
+    if (Math.abs(manager.camera.far - far) > 1) {
+      manager.camera.far = far;
+      manager.camera.updateProjectionMatrix();
+      manager.setFogSpan(far * 0.55, far * 0.95);
+    }
+  }
+
+  // ---- 路线系统 ----
+
+  /** 显示/清空选中路线的 3D 主线与标注点。 */
+  setRouteDisplay(points: readonly Vec3[] | null, markers?: readonly Vec3[]): void {
+    if (points === null) {
+      this.#routeLayer?.setRoute(null);
+      return;
+    }
+    if (this.#routeLayer === null) {
+      const layer = new RouteLayer();
+      this.#manager.addLayer(layer);
+      this.#routeLayer = layer;
+    }
+    this.#routeLayer.setRoute(points, markers);
+  }
+
+  /**
+   * 开始路线跟跑：相机沿点位序列（float32 xyz）按 durationSeconds 原始节奏回放。
+   * 用户输入立即打断；onProgress 上报进度（fraction/点索引）。
+   */
+  startRoutePlayback(
+    points: Float32Array,
+    durationSeconds: number,
+    onProgress?: (fraction: number, pointIndex: number) => void,
+  ): Promise<boolean> | null {
+    const controls = this.#controls;
+    if (controls === null) {
+      return null;
+    }
+    return controls.startRouteFollow(points, durationSeconds, { onProgress });
+  }
+
+  /** 停止路线跟跑（结束导航）。 */
+  stopRoutePlayback(): void {
+    this.#controls?.cancelRouteFollow();
+  }
+
+  // ---- F 键交互物件 ----
+
+  /** 载入/清空交互物件（换图时随视口调用）。 */
+  setInteractors(doc: InteractorsDoc | null): void {
+    if (doc === null) {
+      this.#interactorLayer?.setInteractors(null);
+      return;
+    }
+    if (this.#interactorLayer === null) {
+      const layer = new InteractorLayer();
+      this.#manager.addLayer(layer);
+      this.#interactorLayer = layer;
+    }
+    this.#interactorLayer.setInteractors(doc);
+  }
+
+  /** 近旁交互物件查询（以相机注视点为准）；无数据返回 null。 */
+  nearestInteractor(): NearbyInteractor | null {
+    const layer = this.#interactorLayer;
+    if (layer === null || this.#controls === null) {
+      return null;
+    }
+    const target = this.#controls.target;
+    return layer.nearestInteractor({ x: target.x, y: target.y, z: target.z });
+  }
+
+  /** 交互物件高亮（近旁提示态）。 */
+  setInteractorHighlight(nearby: NearbyInteractor | null): void {
+    this.#interactorLayer?.setHighlight(nearby);
+  }
+
+  /** F 键交互动作：梯子/绳索=传送（缓动飞抵对端）；滑索=按数据速度滑行。 */
+  interact(nearby: NearbyInteractor): void {
     const controls = this.#controls;
     if (controls === null) {
       return;
     }
-    if (settings.fov !== undefined) {
-      controls.setFov(settings.fov);
+    if (nearby.kind === "zipline" && nearby.slideSpeed > 0) {
+      const points = new Float32Array([
+        nearby.point.x,
+        nearby.point.y,
+        nearby.point.z,
+        nearby.target.x,
+        nearby.target.y,
+        nearby.target.z,
+      ]);
+      const duration = ziplineDurationSeconds(nearby.point, nearby.target, nearby.slideSpeed);
+      void controls.startRouteFollow(points, duration, { eyeHeight: 0.8, lookAheadT: 0.5 });
+      return;
     }
-    if (settings.sensitivity !== undefined) {
-      controls.setSensitivity(settings.sensitivity);
-    }
+    void controls.flyTo(nearby.target, controls.getDistance());
   }
 
   /** 回出生点：复位到进场取景位；地图未加载时返回 false。 */

@@ -1,0 +1,5 @@
+<svg width="768" height="120" viewBox="0 0 768 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="10" y="32" width="3" height="56" fill="#FFFFFF" fill-opacity="0.9"/>
+  <text x="30" y="62" fill="#FFFFFF" font-family="'PingFang SC', 'Microsoft YaHei', 'Segoe UI', sans-serif" font-size="46" font-weight="700" dominant-baseline="central">DF3dMapTool</text>
+  <text x="315" y="63" fill="#FFFFFF" font-family="'PingFang SC', 'Microsoft YaHei', 'Segoe UI', sans-serif" font-size="24" font-weight="400" dominant-baseline="central">Open-source 3D tactical map viewer</text>
+</svg>

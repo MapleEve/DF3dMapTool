@@ -159,7 +159,7 @@ export function Sidebar() {
                 : (category.label ?? category.id);
             return (
               <li key={category.id}>
-                <label className="sidebar-category">
+                <label className={checked ? "sidebar-category" : "sidebar-category is-hidden"}>
                   <input
                     type="checkbox"
                     checked={checked}

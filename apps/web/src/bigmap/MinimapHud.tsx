@@ -41,14 +41,14 @@ export function MinimapHud(props: MinimapHudProps) {
   const { imageUrl, imageSize, calibration, pois, regions, playerXZ, playerYaw, sizePx } = props;
   const { t } = useTranslation();
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const imageRef = useRef<HTMLImageElement | null>(null);
-  const [imageVersion, setImageVersion] = useState(0);
+  // 底图位图以 state 承载（url 配对防串层；解码完成/换层都触发重渲染重绘）。
+  const [imageState, setImageState] = useState<{ url: string; image: HTMLImageElement } | null>(
+    null,
+  );
 
-  // 底图加载（与 BigmapCanvas 同构：换图/换层后重建位图）。
+  // 底图加载（异步回调写 state；渲染期无 ref 读写、无同步 setState）。
   useEffect(() => {
     if (imageUrl === null) {
-      imageRef.current = null;
-      setImageVersion((version) => version + 1);
       return;
     }
     let cancelled = false;
@@ -57,17 +57,12 @@ export function MinimapHud(props: MinimapHudProps) {
     image
       .decode()
       .then(() => {
-        if (cancelled) {
-          return;
+        if (!cancelled) {
+          setImageState({ url: imageUrl, image });
         }
-        imageRef.current = image;
-        setImageVersion((version) => version + 1);
       })
       .catch(() => {
-        if (!cancelled) {
-          imageRef.current = null;
-          setImageVersion((version) => version + 1);
-        }
+        // 解码失败保持无位图态（占位底色），url 不配对自然失效。
       });
     return () => {
       cancelled = true;
@@ -76,7 +71,6 @@ export function MinimapHud(props: MinimapHudProps) {
 
   // 每次渲染后重绘：相机 HUD 200ms 节流 + 楼层/筛选/贴图变化都会触发渲染。
   useEffect(() => {
-    void imageVersion; // 位图就绪也是一次重绘触发。
     const canvas = canvasRef.current;
     if (canvas === null) {
       return;
@@ -94,7 +88,7 @@ export function MinimapHud(props: MinimapHudProps) {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.fillStyle = "#080c11";
     ctx.fillRect(0, 0, sizePx, sizePx);
-    const image = imageRef.current;
+    const image = imageState !== null && imageState.url === imageUrl ? imageState.image : null;
     if (image === null || imageSize === null || calibration === null) {
       return;
     }
@@ -144,7 +138,7 @@ export function MinimapHud(props: MinimapHudProps) {
       }
       ctx.beginPath();
       ctx.arc(point.x, point.y, poi.selected === true ? 4.5 : 3, 0, Math.PI * 2);
-      ctx.fillStyle = poi.selected === true ? "#5aa9ff" : poi.color;
+      ctx.fillStyle = poi.selected === true ? "#0ff796" : poi.color;
       ctx.fill();
       ctx.lineWidth = 1;
       ctx.strokeStyle = "rgba(5, 8, 12, 0.9)";
@@ -167,7 +161,7 @@ export function MinimapHud(props: MinimapHudProps) {
       ctx.lineTo(0, 2.8);
       ctx.lineTo(-5, 5.5);
       ctx.closePath();
-      ctx.fillStyle = "#5aa9ff";
+      ctx.fillStyle = "#0ff796";
       ctx.strokeStyle = "rgba(5, 8, 12, 0.9)";
       ctx.lineWidth = 1.2;
       ctx.fill();

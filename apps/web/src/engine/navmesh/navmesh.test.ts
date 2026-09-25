@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { NAVMESH_FORMAT, NavMesh, navMeshFromDoc, type NavmeshDoc } from "./navmesh";
+import {
+  NAVMESH_FORMAT,
+  NavMesh,
+  buildNavmeshData,
+  navMeshFromDoc,
+  type NavmeshDoc,
+} from "./navmesh";
 
 /** 类型化数组 → base64（顶点/索引流编码）。 */
 function toBase64(view: Float32Array | Uint32Array): string {
@@ -120,10 +126,70 @@ describe("NavMesh 原始构造（uint32 索引）", () => {
   it("直接以 Float32Array/Uint32Array 构造并寻路", () => {
     const vertices = new Float32Array([0, 0, 0, 10, 0, 0, 10, 0, 10, 0, 0, 10]);
     const indices = new Uint32Array([0, 1, 2, 0, 2, 3]);
-    const mesh = new NavMesh(vertices, indices);
+    const mesh = new NavMesh(buildNavmeshData(vertices, indices));
     const path = mesh.findPath({ x: 1, y: 0, z: 1 }, { x: 9, y: 0, z: 9 });
     expect(path).not.toBeNull();
     expect(path!.points.length).toBe(2);
     expect(path!.distance).toBeCloseTo(Math.hypot(8, 8), 6);
+  });
+});
+
+describe("NavMesh Worker 构建一致性", () => {
+  // Worker 环境判定：vitest node 环境无 Worker 时跳过（bun/浏览器运行真实 Worker 路径）。
+  const hasWorker = typeof Worker !== "undefined";
+
+  it.skipIf(!hasWorker)("Worker 构建产物与主线程构建逐字段一致", async () => {
+    const doc = gridWithIsland();
+    const vertices = new Float32Array(
+      Uint8Array.from(atob(doc.vertexData), (c) => c.charCodeAt(0)).buffer,
+    );
+    const indices = new Uint32Array(
+      Uint8Array.from(atob(doc.polygonData), (c) => c.charCodeAt(0)).buffer,
+    );
+    const mainData = buildNavmeshData(vertices, indices);
+
+    const worker = new Worker(new URL("./navmeshWorker.ts", import.meta.url), {
+      type: "module",
+    });
+    try {
+      const response = await new Promise<{ type: string; data?: unknown }>((resolve, reject) => {
+        worker.addEventListener("message", (event: MessageEvent) => resolve(event.data));
+        worker.addEventListener("error", () => reject(new Error("worker error")));
+        const request = {
+          type: "build",
+          seq: 1,
+          vertexData: doc.vertexData,
+          polygonData: doc.polygonData,
+        };
+        // oxlint-disable-next-line require-post-message-target-origin
+        worker.postMessage(request);
+      });
+      expect(response.type).toBe("built");
+      const workerData = (response as { data: typeof mainData }).data;
+      expect(workerData.triangleCount).toBe(mainData.triangleCount);
+      expect(Array.from(workerData.triVerts)).toEqual(Array.from(mainData.triVerts));
+      expect(Array.from(workerData.centroids)).toEqual(Array.from(mainData.centroids));
+      expect(Array.from(workerData.neighborsOffset)).toEqual(Array.from(mainData.neighborsOffset));
+      expect(Array.from(workerData.neighbors)).toEqual(Array.from(mainData.neighbors));
+      expect(Array.from(workerData.cellKeys)).toEqual(Array.from(mainData.cellKeys));
+      expect(Array.from(workerData.cellBucketOffset)).toEqual(
+        Array.from(mainData.cellBucketOffset),
+      );
+      expect(Array.from(workerData.cellBuckets)).toEqual(Array.from(mainData.cellBuckets));
+
+      // 查询一致性：两条路径的 NavMesh 对同一查询给出同一结果。
+      const workerMesh = new NavMesh(workerData);
+      const mainMesh = new NavMesh(mainData);
+      const from = { x: 1, y: 0, z: 10 };
+      const to = { x: 19, y: 0, z: 10 };
+      const workerPath = workerMesh.findPath(from, to);
+      const mainPath = mainMesh.findPath(from, to);
+      expect(workerPath).not.toBeNull();
+      expect(mainPath).not.toBeNull();
+      expect(workerPath!.points).toEqual(mainPath!.points);
+      expect(workerPath!.distance).toBeCloseTo(mainPath!.distance, 6);
+    } finally {
+      worker.terminate();
+    }
   });
 });

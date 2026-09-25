@@ -15,9 +15,18 @@ export const QUALITY_PIXEL_RATIO: Readonly<Record<QualityLevel, number>> = {
 export const FOV_RANGE = [30, 100] as const;
 export const FOV_DEFAULT = 70;
 
-/** 视角灵敏度范围与默认值（1 为默认手感），与引擎 setSensitivity 钳制对齐。 */
+/**
+ * 视角灵敏度范围与默认值（1 为默认手感），与引擎 setSensitivity 钳制对齐。
+ */
 export const SENSITIVITY_RANGE = [0.2, 3] as const;
 export const SENSITIVITY_DEFAULT = 1;
+
+/**
+ * 视野渲染距离范围与默认值（米）。默认 200 为上游实测值（设置页参数行）；
+ * 滑条上下界为应用侧界定（上游仅提供当前值，无范围口径）。
+ */
+export const RENDER_DISTANCE_RANGE = [100, 1000] as const;
+export const RENDER_DISTANCE_DEFAULT = 200;
 
 /** 帧率上限档位：null 为不限（跟随显示器刷新率）。 */
 export type FrameLimitLevel = "unlimited" | "30" | "60";
@@ -30,6 +39,7 @@ export const FRAME_LIMIT_FPS: Readonly<Record<FrameLimitLevel, number | null>> =
 const STORAGE_KEY_QUALITY = "df3dmaptool:quality";
 const STORAGE_KEY_FOV = "df3dmaptool:fov";
 const STORAGE_KEY_SENSITIVITY = "df3dmaptool:sensitivity";
+const STORAGE_KEY_RENDER_DISTANCE = "df3dmaptool:renderDistance";
 const STORAGE_KEY_FRAME_LIMIT = "df3dmaptool:frameLimit";
 const STORAGE_KEY_ANTIALIAS = "df3dmaptool:antialias";
 const STORAGE_KEY_AIR_JUMP = "df3dmaptool:airJump";
@@ -107,6 +117,8 @@ interface UiStoreState {
   fov: number;
   /** 视角灵敏度（1 为默认手感）。 */
   sensitivity: number;
+  /** 视野渲染距离（米）：相机远平面/雾的可见范围（设置面板参数行）。 */
+  renderDistance: number;
   /** 帧率上限档位。 */
   frameLimit: FrameLimitLevel;
   /** 抗锯齿（重建渲染器才生效，重启页面后应用）。 */
@@ -131,6 +143,7 @@ interface UiStoreState {
   setQuality: (quality: QualityLevel) => void;
   setFov: (fov: number) => void;
   setSensitivity: (sensitivity: number) => void;
+  setRenderDistance: (meters: number) => void;
   setFrameLimit: (level: FrameLimitLevel) => void;
   setAntialias: (antialias: boolean) => void;
   setAirJump: (airJump: boolean) => void;
@@ -151,6 +164,11 @@ export const useUiStore = create<UiStoreState>()((set, get) => ({
   quality: readStoredQuality(),
   fov: readStoredNumber(STORAGE_KEY_FOV, FOV_RANGE, FOV_DEFAULT),
   sensitivity: readStoredNumber(STORAGE_KEY_SENSITIVITY, SENSITIVITY_RANGE, SENSITIVITY_DEFAULT),
+  renderDistance: readStoredNumber(
+    STORAGE_KEY_RENDER_DISTANCE,
+    RENDER_DISTANCE_RANGE,
+    RENDER_DISTANCE_DEFAULT,
+  ),
   frameLimit: readStoredFrameLimit(),
   antialias: readStoredBoolean(STORAGE_KEY_ANTIALIAS, true),
   airJump: readStoredBoolean(STORAGE_KEY_AIR_JUMP, true),
@@ -182,6 +200,11 @@ export const useUiStore = create<UiStoreState>()((set, get) => ({
     const next = clampRange(sensitivity, SENSITIVITY_RANGE, SENSITIVITY_DEFAULT);
     persist(STORAGE_KEY_SENSITIVITY, String(next));
     set({ sensitivity: next });
+  },
+  setRenderDistance: (meters) => {
+    const next = clampRange(meters, RENDER_DISTANCE_RANGE, RENDER_DISTANCE_DEFAULT);
+    persist(STORAGE_KEY_RENDER_DISTANCE, String(next));
+    set({ renderDistance: next });
   },
   setFrameLimit: (frameLimit) => {
     persist(STORAGE_KEY_FRAME_LIMIT, frameLimit);

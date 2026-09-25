@@ -84,7 +84,7 @@ function MiniPathView({ path }: { path: readonly Vec3[] }) {
       <polyline
         points={points}
         fill="none"
-        stroke="#36d399"
+        stroke="#0ff796"
         strokeWidth={2}
         strokeLinejoin="round"
       />
@@ -92,13 +92,13 @@ function MiniPathView({ path }: { path: readonly Vec3[] }) {
         cx={(path[0].x - cx) * scale + VIEW_SIZE / 2}
         cy={(path[0].z - cz) * scale + VIEW_SIZE / 2}
         r={3}
-        fill="#8fd7ff"
+        fill="#ffffff"
       />
       <circle
         cx={(last.x - cx) * scale + VIEW_SIZE / 2}
         cy={(last.z - cz) * scale + VIEW_SIZE / 2}
         r={3}
-        fill="#ffc65c"
+        fill="#ffda74"
       />
     </svg>
   );

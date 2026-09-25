@@ -1,0 +1,211 @@
+/* 加载页样式（boot 屏 + 进图屏）。
+ * 设计基准 1920x1080：boot 屏由 #loading-cover 整体 transform:scale(min(vw/1920, vh/1080))
+ * 缩放（resize 重算）；进图屏经 --ui-scale 变量按同一比例换算各锚点尺寸。
+ * 本文件自包含，不依赖应用壳的 ui.css 变量。 */
+
+/* ---------- boot 屏（结构/类名/ID 与实测 DOM 一致；.hidden 故意无样式 = 硬切换） ---------- */
+
+#loading-container {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+  background: linear-gradient(180deg, #101010 0%, #001e12 100%);
+}
+
+#loading-cover {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transform-origin: center center;
+}
+
+#loading-container .lottie-container {
+  width: 210px;
+  height: 168px;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  /* 垂直居中（1920x1080 下实测 y=456，即 (1080-168)/2）。 */
+  top: calc(50% - 84px);
+  overflow: visible;
+}
+
+#loading-container .loading-text {
+  color: rgba(255, 255, 255, 0.5);
+  text-align: left;
+  font-family: "PingFangSc-Regular", "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-size: 36px;
+  font-weight: 400;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: calc(50% - 50px + 100px);
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+#loading-container .loading-tip-wrapper {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: calc(50% + 170px);
+  width: 1000px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0 40px;
+  box-sizing: border-box;
+}
+
+#loading-container .loading-tip-bg {
+  position: relative;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+  object-fit: fill;
+}
+
+#loading-container .loading-tip {
+  position: absolute;
+  width: 90%;
+  color: #21ef9b;
+  text-align: center;
+  font-family: "PingFangSc-Medium", "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-size: 40px;
+  font-weight: 500;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  line-height: 1.2;
+  max-height: 100%;
+}
+
+#loading-container .logo {
+  width: 768px;
+  height: 120px;
+  left: 50%;
+  top: calc(50% - 300px);
+  transform: translateX(-50%);
+  position: absolute;
+  overflow: hidden;
+}
+
+/* ---------- 进图加载屏（半透明遮罩盖在 3D 画布上，地图名/标签/大百分比/底部条） ---------- */
+
+/* 进图加载期间隐藏应用壳 HUD：加载屏下只应见到半透明场景本身，
+ * HUD（顶栏/侧栏/状态栏等）随加载完成硬切出现。画布视口保持可见（即遮罩下的场景）。 */
+.app-root:has(> .scene-loading) > *:not(.map-viewport):not(.scene-loading) {
+  visibility: hidden;
+}
+
+.scene-loading {
+  --ui-scale: 1;
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(0, 0, 0, 0.502);
+  font-family: "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+}
+
+/* 地图名：顶部居中，白字 50px。 */
+.scene-loading-map-name {
+  position: absolute;
+  left: 50%;
+  top: calc(196px * var(--ui-scale));
+  transform: translateX(-50%);
+  width: calc(420px * var(--ui-scale));
+  height: calc(143px * var(--ui-scale));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-size: calc(50px * var(--ui-scale));
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+/* 「加载中」标签：地图名下方，主绿 32px。 */
+.scene-loading-label {
+  position: absolute;
+  left: 50%;
+  top: calc(336px * var(--ui-scale));
+  transform: translateX(-50%);
+  width: calc(200px * var(--ui-scale));
+  height: calc(50px * var(--ui-scale));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #0ff796;
+  font-size: calc(32px * var(--ui-scale));
+  font-weight: 400;
+}
+
+/* 大百分比：进度区居中，主绿 180px。 */
+.scene-loading-percent {
+  position: absolute;
+  left: 50%;
+  bottom: calc(299px * var(--ui-scale));
+  transform: translateX(-50%);
+  width: calc(553px * var(--ui-scale));
+  height: calc(352px * var(--ui-scale));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #0ff796;
+  font-size: calc(180px * var(--ui-scale));
+  font-weight: 400;
+  line-height: 1;
+}
+
+/* 底部条：全宽 130px 半透明黑，提示文字左起 60px 垂直居中，白字 32px。 */
+.scene-loading-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: calc(130px * var(--ui-scale));
+  background: rgba(0, 0, 0, 0.502);
+}
+
+.scene-loading-tip {
+  position: absolute;
+  left: calc(60px * var(--ui-scale));
+  top: 50%;
+  transform: translateY(-50%);
+  width: calc(1083px * var(--ui-scale));
+  color: #ffffff;
+  font-size: calc(32px * var(--ui-scale));
+  font-weight: 400;
+  line-height: 1.2;
+}
+
+/* 底部全宽进度滑条：轨道白 29.8%，填充主绿。 */
+.scene-loading-slider {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: calc(17px * var(--ui-scale));
+  background: rgba(255, 255, 255, 0.298);
+}
+
+.scene-loading-slider-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: #0ff796;
+}
