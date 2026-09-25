@@ -1,6 +1,8 @@
 import { useTranslation } from "react-i18next";
 import type { PoiCategory, PoiDefinition } from "@/poi/types";
 import { useNavStore } from "@/state/navStore";
+import { useViewCoupling } from "@/state/viewCoupling";
+import { useViewStore } from "@/state/viewStore";
 
 export interface PoiBubbleProps {
   poi: PoiDefinition;
@@ -14,6 +16,8 @@ export interface PoiBubbleProps {
 export function PoiBubble({ poi, category, iconUrl, onClose, onLocate }: PoiBubbleProps) {
   const { t } = useTranslation();
   const requestPath = useNavStore((state) => state.requestPath);
+  const requestSandboxLocate = useViewCoupling((state) => state.requestSandboxLocate);
+  const setView = useViewStore((state) => state.setView);
   // 数据包派生分类的 labelKey 不在静态 i18n 键表内，运行时按字符串查表并回退 label。
   const categoryLabel =
     category?.labelKey !== undefined
@@ -61,6 +65,17 @@ export function PoiBubble({ poi, category, iconUrl, onClose, onLocate }: PoiBubb
       <footer className="poi-bubble-actions">
         <button type="button" onClick={onLocate}>
           {t("poi.locate")}
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            // 3D→2D 定位：世界坐标进共享请求通道，切到 2D 沙盘视图
+            // （视图侧经站点仿射换算后居中，区域级近似位置）。
+            requestSandboxLocate(poi.position);
+            setView("2d");
+          }}
+        >
+          {t("poi.locateIn2d")}
         </button>
         <button
           type="button"

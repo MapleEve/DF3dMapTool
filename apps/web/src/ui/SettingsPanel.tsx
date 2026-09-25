@@ -1,6 +1,6 @@
 import { useEffect, useState, type ChangeEvent } from "react";
 import { useTranslation } from "react-i18next";
-import { SUPPORTED_LANGUAGES, type Language } from "@/i18n";
+import { LANGUAGE_LABELS, SUPPORTED_LANGUAGES, type Language } from "@/i18n";
 import {
   FOV_RANGE,
   SENSITIVITY_RANGE,
@@ -14,14 +14,14 @@ const FRAME_LIMIT_LEVELS: readonly FrameLimitLevel[] = ["unlimited", "60", "30"]
 
 type SettingsTab = "graphics" | "general";
 
-/** 设置面板（双 Tab）：画面（画质/抗锯齿/帧率/全屏/视场角）与通用（语言/灵敏度/回出生点/源站对齐项）。 */
+/** 设置面板（双 Tab）：画面（画质/抗锯齿/帧率/全屏/视场角）与通用（语言/灵敏度/回出生点/上游对齐项）。 */
 export function SettingsPanel() {
   const { t } = useTranslation();
   const settingsOpen = useUiStore((state) => state.settingsOpen);
   const setSettingsOpen = useUiStore((state) => state.setSettingsOpen);
   const [tab, setTab] = useState<SettingsTab>("graphics");
 
-  // Esc 关闭（与源站菜单一致）。
+  // Esc 关闭（与上游菜单行为一致）。
   useEffect(() => {
     if (!settingsOpen) {
       return;
@@ -199,7 +199,7 @@ function GraphicsTab() {
   );
 }
 
-/** 通用 Tab：语言、灵敏度、回出生点、空中跳跃/音量/环境粒子（源站对齐项）。 */
+/** 通用 Tab：语言、灵敏度、回出生点、空中跳跃/音量/环境粒子（上游对齐项）。 */
 function GeneralTab() {
   const { t } = useTranslation();
   const language = useUiStore((state) => state.language);
@@ -228,7 +228,7 @@ function GeneralTab() {
         <select id="settings-language" value={language} onChange={handleLanguageChange}>
           {SUPPORTED_LANGUAGES.map((code) => (
             <option key={code} value={code}>
-              {code === "zh" ? "中文" : "English"}
+              {LANGUAGE_LABELS[code]}
             </option>
           ))}
         </select>

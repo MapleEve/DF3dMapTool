@@ -21,6 +21,11 @@ export interface MapDefinition {
   readonly defaultFloor: number;
   /** 数据包索引容器地址（分块/导航容器按清单相对路径派生）。 */
   readonly bundleUrl: string;
+  /**
+   * 2D 沙盘容器地址（dmap-sandbox2d-manifest/1）；缺失（如潮汐监狱）表示该图
+   * 无 2D 沙盘数据，2D 视图渲染空态（上游亦为空页）。
+   */
+  readonly sandbox2dUrl?: string;
   /** 已标定的摆放规模（标定信息，供状态栏展示）。 */
   readonly knownPlacementCount?: number;
 }

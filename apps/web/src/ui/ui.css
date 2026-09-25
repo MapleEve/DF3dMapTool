@@ -15,6 +15,11 @@
   display: block;
 }
 
+/* 2D 沙盘视图激活时隐藏 3D 视口（场景保持挂载，仅停渲染与交互）。 */
+.map-viewport.hidden {
+  display: none;
+}
+
 /* ---------- 加载进度 ---------- */
 
 .load-progress {
@@ -139,9 +144,55 @@
   transition: border-color 0.15s ease;
 }
 
+/* 顶栏语言下拉（四语言）：沿用 topbar-field select 的控件外观。 */
+.topbar-language {
+  background: #16222f;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  color: var(--text);
+  font-size: 13px;
+  transition: border-color 0.15s ease;
+}
+
+.topbar-language:hover {
+  border-color: var(--accent);
+}
+
 .topbar-button:hover,
 .topbar-button.active {
   border-color: var(--accent);
+}
+
+/* ---------- 2D/3D 沙盘视图切换 ---------- */
+
+.view-switch {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.view-switch-button {
+  background: #141c26;
+  border: none;
+  padding: 6px 14px;
+  font-size: 13px;
+  color: var(--text-dim);
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.view-switch-button:hover {
+  color: var(--text);
+}
+
+.view-switch-button.active {
+  background: var(--accent);
+  color: #0b0f14;
+  font-weight: 600;
 }
 
 /* ---------- 地图切换器 ---------- */
@@ -487,6 +538,8 @@
 .poi-bubble-actions {
   margin-top: 10px;
   display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
   justify-content: flex-end;
 }
 
@@ -905,4 +958,616 @@
   margin: 2px auto 0;
   background: rgba(10, 16, 24, 0.6);
   border-radius: 6px;
+}
+
+/* ---------- 全页 2D 沙盘视图 ---------- */
+/* 视觉口径对齐上游沙盘：#161E23 侧栏底 / #0FF796 主题绿 / #AAAAAA 次级文本 /
+ * #0F1316 输入底 / #454B4F 描边（画布内标记/标签/弹窗样式硬编码于 TileMapCanvas）。 */
+
+.sandbox2d-view {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  background: var(--bg);
+  z-index: 5;
+}
+
+/* 左面板：411px（上游 w-[411px]）；详情态与侧栏态互斥（同一左槽）。 */
+.sandbox2d-panel {
+  position: relative;
+  width: 411px;
+  flex-shrink: 0;
+  height: 100%;
+  background: #161e23;
+  color: #ffffff;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.sandbox2d-panel-state {
+  margin: auto;
+  padding: 24px;
+  text-align: center;
+  color: #aaaaaa;
+  font-size: 13px;
+}
+
+.sandbox2d-panel-state button {
+  margin-top: 12px;
+  padding: 6px 18px;
+  background: #0f1316;
+  border: 1px solid rgba(15, 247, 150, 0.4);
+  color: #0ff796;
+  cursor: pointer;
+}
+
+.sandbox2d-map {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.sandbox2d-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+  touch-action: none;
+}
+
+.sandbox2d-canvas:active {
+  cursor: grabbing;
+}
+
+/* 缩放控件：Leaflet zoom control 口径（topright）。 */
+.sandbox2d-zoom {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  flex-direction: column;
+  z-index: 20;
+}
+
+.sandbox2d-zoom button {
+  width: 30px;
+  height: 30px;
+  background: #161e23;
+  border: 1px solid #454b4f;
+  color: #ffffff;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.sandbox2d-zoom button:first-child {
+  border-bottom: none;
+}
+
+.sandbox2d-zoom button:hover {
+  color: #0ff796;
+  border-color: #0ff796;
+}
+
+/* "3D Interactive Map" 入口：上游 entry 横幅位置（absolute top-10 right-5）；
+ * 应用内为文字按钮（四语言可用，不引上游横幅美术——记录为中性化决策）。 */
+.sandbox2d-entry3d {
+  position: absolute;
+  top: 52px;
+  right: 20px;
+  z-index: 20;
+  padding: 10px 18px;
+  background: rgba(15, 19, 22, 0.85);
+  border: 1px solid rgba(15, 247, 150, 0.6);
+  color: #0ff796;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.sandbox2d-entry3d:hover {
+  background: rgba(15, 247, 150, 0.12);
+}
+
+/* 无 2D 数据的图（潮汐监狱）：上游 catch-all 空页对等物。 */
+.sandbox2d-empty-map {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: #1e2529;
+}
+
+.sandbox2d-empty-map-title {
+  margin: 0;
+  color: #aaaaaa;
+  font-size: 15px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.sandbox2d-empty-map-note {
+  margin: 0;
+  color: #6a7a85;
+  font-size: 12px;
+}
+
+/* 侧栏：过滤行 / 搜索 / 组页签 / 清单。 */
+.sandbox2d-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%;
+  padding: 16px 16px 20px;
+  overflow-y: auto;
+  scrollbar-color: #454b4f transparent;
+}
+
+.sandbox2d-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sandbox2d-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 120px;
+  font-size: 11px;
+  color: #aaaaaa;
+}
+
+.sandbox2d-field-wide {
+  flex-basis: 100%;
+}
+
+.sandbox2d-field select {
+  background: #0f1316;
+  border: 1px solid #414141;
+  color: #ffffff;
+  padding: 7px 8px;
+  font-size: 13px;
+  min-width: 0;
+}
+
+.sandbox2d-field select:focus {
+  outline: none;
+  border-color: #0ff796;
+}
+
+.sandbox2d-search {
+  position: relative;
+}
+
+.sandbox2d-search input {
+  width: 100%;
+  box-sizing: border-box;
+  height: 42px;
+  background: #0f1316;
+  border: 1px solid #414141;
+  color: #ffffff;
+  padding: 0 36px;
+  font-size: 13px;
+  caret-color: #0ff796;
+}
+
+.sandbox2d-search input:focus {
+  outline: none;
+  border-color: #414141;
+}
+
+.sandbox2d-search input::placeholder {
+  color: #8a8e91;
+}
+
+.sandbox2d-search-clear {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #8a8e91;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.sandbox2d-search-clear:hover {
+  color: #ffffff;
+}
+
+.sandbox2d-suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 40;
+  max-height: 256px;
+  overflow-y: auto;
+  background: #161e23;
+  border: 1px solid #414141;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+.sandbox2d-suggestions button {
+  display: block;
+  width: 100%;
+  padding: 8px 16px;
+  background: none;
+  border: none;
+  color: #aaaaaa;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sandbox2d-suggestions button:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #0ff796;
+}
+
+.sandbox2d-grouptabs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 8px;
+}
+
+.sandbox2d-grouptabs button {
+  height: 40px;
+  background: transparent;
+  border: 1px solid #454b4f;
+  color: #aaaaaa;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.sandbox2d-grouptabs button:hover {
+  border-color: #0ff796;
+  color: #0ff796;
+}
+
+.sandbox2d-grouptabs button.active {
+  border-color: #0ff796;
+  color: #0ff796;
+}
+
+.sandbox2d-selectall {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.sandbox2d-selectall label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #ababab;
+  cursor: pointer;
+  accent-color: #0ff796;
+}
+
+.sandbox2d-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sandbox2d-legend h3 {
+  margin: 0 0 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #454b4f;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.sandbox2d-legend-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+.sandbox2d-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px;
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s ease;
+}
+
+.sandbox2d-legend-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.sandbox2d-legend-item.selected {
+  border-color: #ffffff;
+}
+
+.sandbox2d-legend-icon {
+  position: relative;
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #454b4f;
+  background: #0f1316;
+}
+
+.sandbox2d-legend-item.selected .sandbox2d-legend-icon {
+  border-color: #ffffff;
+}
+
+.sandbox2d-legend-icon img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.sandbox2d-legend-placeholder {
+  width: 12px;
+  height: 12px;
+  border: 1px dashed #454b4f;
+}
+
+.sandbox2d-legend-icon .count {
+  position: absolute;
+  right: 1px;
+  bottom: 1px;
+  font-size: 10px;
+  color: #8a8e91;
+  background: rgba(15, 19, 22, 0.7);
+  padding: 0 2px;
+}
+
+.sandbox2d-legend-icon .count.selected {
+  color: #ffffff;
+}
+
+.sandbox2d-legend-name {
+  color: #aaaaaa;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sandbox2d-legend-item:hover .sandbox2d-legend-name {
+  color: #0ff796;
+}
+
+.sandbox2d-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 32px 0;
+  gap: 12px;
+  color: #aaaaaa;
+  font-size: 13px;
+}
+
+.sandbox2d-empty button {
+  padding: 6px 18px;
+  background: #0f1316;
+  border: 1px solid rgba(15, 247, 150, 0.4);
+  color: #0ff796;
+  cursor: pointer;
+}
+
+/* 详情面板（左槽详情，选中态互斥）。 */
+.sandbox2d-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  height: 100%;
+  padding: 20px 16px;
+  overflow-y: auto;
+  scrollbar-color: #454b4f transparent;
+}
+
+.sandbox2d-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sandbox2d-detail-icon {
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #ffffff;
+  background: #0f1316;
+  padding: 3px;
+}
+
+.sandbox2d-detail-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.sandbox2d-detail-header h1 {
+  flex: 1;
+  margin: 0;
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.sandbox2d-detail-close {
+  width: 29px;
+  height: 29px;
+  flex-shrink: 0;
+  background: #0f1316;
+  border: 1px solid #454b4f;
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.sandbox2d-detail-close:hover {
+  border-color: #0ff796;
+  color: #0ff796;
+}
+
+.sandbox2d-detail-updated {
+  margin: 0;
+  color: #808080;
+  font-size: 13px;
+}
+
+.sandbox2d-detail-divider {
+  height: 1px;
+  background: #454b4f;
+  position: relative;
+}
+
+.sandbox2d-detail-divider::before,
+.sandbox2d-detail-divider::after {
+  content: "";
+  position: absolute;
+  top: -2px;
+  width: 8px;
+  height: 5px;
+  background: #ffffff;
+}
+
+.sandbox2d-detail-divider::before {
+  left: 0;
+}
+
+.sandbox2d-detail-divider::after {
+  right: 0;
+}
+
+.sandbox2d-detail-desc {
+  margin: 0;
+  color: #aaaaaa;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-line;
+}
+
+.sandbox2d-detail-shot {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: #0f1316;
+  border: 1px solid #454b4f;
+}
+
+.sandbox2d-detail-shot img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.sandbox2d-detail-locate {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: auto;
+}
+
+.sandbox2d-detail-locate button {
+  padding: 8px 16px;
+  background: #0f1316;
+  border: 1px solid rgba(15, 247, 150, 0.5);
+  color: #0ff796;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.sandbox2d-detail-locate button:hover {
+  background: rgba(15, 247, 150, 0.12);
+}
+
+.sandbox2d-detail-locate-note {
+  color: #6a7a85;
+  font-size: 11px;
+}
+
+/* 右键坐标弹窗（坐标弹窗配色口径）。 */
+.sandbox2d-coord-popup {
+  position: absolute;
+  z-index: 30;
+  min-width: 150px;
+  padding: 10px 12px;
+  background: #0d161b;
+  border: 1px solid rgba(15, 247, 150, 0.6);
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+
+.sandbox2d-coord-popup-title {
+  color: #8aa2b1;
+  font-size: 12px;
+  letter-spacing: 0.3px;
+}
+
+.sandbox2d-coord-popup-value-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.sandbox2d-coord-popup-value {
+  flex: 1;
+  color: #0ff796;
+  font-family: ui-monospace, SFMono-Regular, Consolas, Menlo, Monaco, monospace;
+  font-size: 15px;
+  font-weight: 600;
+  word-break: break-all;
+}
+
+.sandbox2d-coord-popup-copy {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 1px solid rgba(15, 247, 150, 0.4);
+  border-radius: 4px;
+  color: #0ff796;
+  cursor: pointer;
+}
+
+.sandbox2d-coord-popup-copy:hover {
+  background: rgba(15, 247, 150, 0.1);
+  border-color: rgba(15, 247, 150, 0.8);
+}
+
+.sandbox2d-coord-popup-close {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  background: none;
+  border: none;
+  color: #757575;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.sandbox2d-coord-popup-close:hover {
+  color: #ffffff;
 }

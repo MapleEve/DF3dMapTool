@@ -2,7 +2,7 @@ import type { ChangeEvent } from "react";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { POI_CATEGORIES } from "@/poi";
-import type { PoiCategory, PoiDefinition } from "@/poi/types";
+import type { PoiCategory, PoiCategoryId, PoiDefinition } from "@/poi/types";
 import { searchPois } from "@/poi/search";
 import { useFloorStore } from "@/state/floorStore";
 import { useMapDataStore } from "@/state/mapDataStore";
@@ -11,6 +11,15 @@ import { usePoiFilterStore } from "@/state/poiFilterStore";
 import { usePoiStore } from "@/state/poiStore";
 import { useSearchStore } from "@/state/searchStore";
 import { useUiStore } from "@/state/uiStore";
+import { useViewCoupling } from "@/state/viewCoupling";
+
+/**
+ * 分类筛选变化后广播给 2D 沙盘侧（组级粗类映射，双视图联动）。
+ * 只在用户动作处显式发起，反向（2D→3D）由耦合桥消费，天然无回环。
+ */
+function syncFilterToCoupling(): void {
+  useViewCoupling.getState().syncFromPoiFilter(usePoiFilterStore.getState().hiddenCategories);
+}
 
 /**
  * 左侧栏：POI 检索（名称/关键字 + 飞入定位）、分类筛选、楼层联动结果列表。
@@ -58,6 +67,22 @@ export function Sidebar() {
   const handleResultClick = (poi: PoiDefinition) => {
     selectPoi(poi.id);
     requestFlyTo(poi.position);
+  };
+
+  // 分类筛选变化后广播给 2D 沙盘侧（组级粗类映射，双视图联动）：
+  // 只在用户动作处显式发起，反向（2D→3D）由耦合桥消费，天然无回环。
+  const handleToggleCategory = (categoryId: PoiCategoryId) => {
+    toggleCategory(categoryId);
+    syncFilterToCoupling();
+  };
+  const handleShowAllCategories = () => {
+    showAllCategories();
+    syncFilterToCoupling();
+  };
+  const handleHideAllCategories = () => {
+    // 全不选作用于当前分类全集（数据包派生 t<TypeId>；数据未加载时为内置兜底表）。
+    hideAllCategories(categories.map((category) => category.id));
+    syncFilterToCoupling();
   };
 
   return (
@@ -117,10 +142,10 @@ export function Sidebar() {
       <section className="sidebar-categories">
         <h3>{t("sidebar.categories")}</h3>
         <div className="sidebar-category-actions">
-          <button type="button" onClick={showAllCategories}>
+          <button type="button" onClick={handleShowAllCategories}>
             {t("sidebar.showAll")}
           </button>
-          <button type="button" onClick={hideAllCategories}>
+          <button type="button" onClick={handleHideAllCategories}>
             {t("sidebar.hideAll")}
           </button>
         </div>
@@ -138,7 +163,7 @@ export function Sidebar() {
                   <input
                     type="checkbox"
                     checked={checked}
-                    onChange={() => toggleCategory(category.id)}
+                    onChange={() => handleToggleCategory(category.id)}
                   />
                   <span
                     className="sidebar-category-dot"

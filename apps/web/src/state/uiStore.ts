@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { Vec3 } from "@/common/geometry";
-import { changeLanguage, DEFAULT_LANGUAGE, LANGUAGE_STORAGE_KEY, type Language } from "@/i18n";
+import { changeLanguage, readStoredLanguage, LANGUAGE_STORAGE_KEY, type Language } from "@/i18n";
 
 /** 画质档位：映射到渲染像素比上限（低 1 / 中 1.5 / 高 2）。 */
 export type QualityLevel = "low" | "medium" | "high";
@@ -35,15 +35,6 @@ const STORAGE_KEY_ANTIALIAS = "df3dmaptool:antialias";
 const STORAGE_KEY_AIR_JUMP = "df3dmaptool:airJump";
 const STORAGE_KEY_VOLUME = "df3dmaptool:volume";
 const STORAGE_KEY_AMBIENT_MOTES = "df3dmaptool:ambientMotes";
-
-function readStoredLanguage(): Language {
-  try {
-    const stored = localStorage.getItem(LANGUAGE_STORAGE_KEY);
-    return stored === "en" || stored === "zh" ? stored : DEFAULT_LANGUAGE;
-  } catch {
-    return DEFAULT_LANGUAGE;
-  }
-}
 
 function readStoredQuality(): QualityLevel {
   try {
@@ -120,7 +111,7 @@ interface UiStoreState {
   frameLimit: FrameLimitLevel;
   /** 抗锯齿（重建渲染器才生效，重启页面后应用）。 */
   antialias: boolean;
-  /** 空中跳跃（源站设置项；模拟器无角色控制，仅保存偏好）。 */
+  /** 空中跳跃（上游对齐设置项；模拟器无角色控制，仅保存偏好）。 */
   airJump: boolean;
   /** 音量百分比 0..100（模拟器暂无音频输出，仅保存偏好）。 */
   volume: number;

@@ -18,7 +18,7 @@ function resetStores(): void {
     progress: 0,
     unavailableMapId: null,
   });
-  useFloorStore.setState({ floors: [1], floor: 1 });
+  useFloorStore.setState({ floors: [1], sandboxFloors: null, floorOptions: [1], floor: 1 });
   usePoiFilterStore.setState({ hiddenCategories: [] });
   useSearchStore.setState({ query: "" });
   usePoiStore.setState({ selectedPoiId: null, flyToTarget: null });
@@ -86,6 +86,33 @@ describe("floorStore", () => {
     useFloorStore.getState().setFloor(3);
     expect(useFloorStore.getState().floor).toBe(3);
     expect(useFloorStore.getState().floors).toEqual([1, 2, 3]);
+  });
+
+  it("楼层选项 = 3D 楼层 ∪ 沙盘楼层（双视图共享选择域）", () => {
+    useFloorStore.getState().applyFloors([1], 1);
+    useFloorStore.getState().setSandboxFloors([-1, 1, 2, 3]);
+    expect(useFloorStore.getState().floorOptions).toEqual([-1, 1, 2, 3]);
+    // 3D 楼层表不受沙盘回填影响（引擎楼层系统只消费 3D 域）。
+    expect(useFloorStore.getState().floors).toEqual([1]);
+
+    // 3D 侧重载（applyFloors）不清沙盘贡献；清空沙盘恢复仅 3D。
+    useFloorStore.getState().applyFloors([1, 2], 2);
+    expect(useFloorStore.getState().floorOptions).toEqual([-1, 1, 2, 3]);
+    useFloorStore.getState().setSandboxFloors(null);
+    expect(useFloorStore.getState().floorOptions).toEqual([1, 2]);
+  });
+
+  it("真实换图复位沙盘楼层贡献；同图位重试不复位", () => {
+    useFloorStore.getState().setSandboxFloors([-1, 1, 2, 3]);
+    useMapStore.getState().setMap(101); // 真实换图
+    expect(useFloorStore.getState().sandboxFloors).toBeNull();
+    expect(useFloorStore.getState().floorOptions).toEqual([1]);
+
+    useFloorStore.getState().setSandboxFloors([2, 3]);
+    useMapStore.getState().setStatus("error", "corrupt");
+    useMapStore.getState().setMap(101); // 同图位原位重试（loadSeq 递增）
+    expect(useMapStore.getState().loadSeq).toBeGreaterThan(0);
+    expect(useFloorStore.getState().sandboxFloors).toEqual([2, 3]);
   });
 });
 

@@ -12,6 +12,7 @@ export const MAPS: readonly MapDefinition[] = [
     knownFloors: [-1, 1, 2],
     defaultFloor: 1,
     bundleUrl: "/assets/damiris/index.dmap",
+    sandbox2dUrl: "/assets/damiris/sandbox2d.dmap",
   },
   {
     id: 102,
@@ -20,6 +21,7 @@ export const MAPS: readonly MapDefinition[] = [
     knownFloors: [1],
     defaultFloor: 1,
     bundleUrl: "/assets/forrest/index.dmap",
+    sandbox2dUrl: "/assets/forrest/sandbox2d.dmap",
   },
   {
     id: 104,
@@ -28,6 +30,7 @@ export const MAPS: readonly MapDefinition[] = [
     knownFloors: [1],
     defaultFloor: 1,
     bundleUrl: "/assets/brakkesh/index.dmap",
+    sandbox2dUrl: "/assets/brakkesh/sandbox2d.dmap",
   },
   {
     id: 105,
@@ -44,6 +47,7 @@ export const MAPS: readonly MapDefinition[] = [
     knownFloors: [1, 2, 3],
     defaultFloor: 1,
     bundleUrl: "/assets/az3/index.dmap",
+    sandbox2dUrl: "/assets/az3/sandbox2d.dmap",
     knownPlacementCount: 45595,
   },
   {
@@ -53,6 +57,7 @@ export const MAPS: readonly MapDefinition[] = [
     knownFloors: [1, 2],
     defaultFloor: 1,
     bundleUrl: "/assets/spacecenter/index.dmap",
+    sandbox2dUrl: "/assets/spacecenter/sandbox2d.dmap",
   },
 ];
 

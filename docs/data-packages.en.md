@@ -4,23 +4,23 @@
 
 All built-in maps ship with the repository as **DMAP encrypted containers** (`.dmap`)
 under `apps/web/public/assets/<code>/`. Each map is split into a set of independent
-containers: the index container renders the UI as soon as it arrives, while 3D chunk
-and navigation containers are fetched on demand. Cloning the repo is all it takes —
-no extra downloads or generation steps.
+containers: the index container renders the UI as soon as it arrives, while 3D chunk,
+navigation and 2D sandbox containers are fetched on demand. Cloning the repo is all it
+takes — no extra downloads or generation steps.
 
 ## 1. Shipped packages
 
 The table below reflects the actual scale of the 6 shipped maps, inventoried from each
 index container's manifest and JSON configs:
 
-| Code        | Map          | MapId | Floors   | 3D chunks | Placements | POIs (total / active / with icon) | Icons | 2D layers | Regions | Index   | Chunks total | Nav     |
-| ----------- | ------------ | ----- | -------- | --------- | ---------- | --------------------------------- | ----- | --------- | ------- | ------- | ------------ | ------- |
-| az3         | AZ3          | 106   | 1–3      | 96        | 45,595     | 146 / 146 / 146                   | 34    | 4         | 13      | 15.8 MB | 18.8 MB      | —       |
-| damiris     | Zero Dam     | 101   | B1, 1, 2 | 76        | 42,830     | 557 / 553 / 480                   | 55    | 2         | 6       | 2.6 MB  | 15.2 MB      | 13.8 MB |
-| forrest     | Layali Grove | 102   | 1        | 139       | 52,472     | 688 / 473 / 620                   | 54    | 1         | 14      | 2.5 MB  | 22.7 MB      | 7.8 MB  |
-| brakkesh    | Brakkesh     | 104   | 1        | 39        | 28,045     | 803 / 801 / 700                   | 54    | 1         | 9       | 2.9 MB  | 9.7 MB       | 12.0 MB |
-| tideprison  | Tide Prison  | 105   | 1–4      | 54        | 28,079     | 915 / 914 / 702                   | 56    | 5         | 16      | 4.2 MB  | 10.7 MB      | 20.4 MB |
-| spacecenter | Space City   | 203   | 1–2      | 48        | 23,395     | 591 / 589 / 476                   | 56    | 3         | 18      | 3.5 MB  | 10.1 MB      | 4.4 MB  |
+| Code        | Map          | MapId | Floors   | 3D chunks | Placements | POIs (total / active / with icon) | Icons | 2D layers | Regions | Index   | Chunks total | Nav     | 2D sandbox |
+| ----------- | ------------ | ----- | -------- | --------- | ---------- | --------------------------------- | ----- | --------- | ------- | ------- | ------------ | ------- | ---------- |
+| az3         | AZ3          | 106   | 1–3      | 96        | 45,595     | 146 / 146 / 146                   | 34    | 4         | 13      | 15.8 MB | 18.8 MB      | —       | 5.0 MB     |
+| damiris     | Zero Dam     | 101   | B1, 1, 2 | 76        | 42,830     | 557 / 553 / 480                   | 55    | 2         | 6       | 2.6 MB  | 15.2 MB      | 13.8 MB | 7.4 MB     |
+| forrest     | Layali Grove | 102   | 1        | 139       | 52,472     | 688 / 473 / 620                   | 54    | 1         | 14      | 2.5 MB  | 22.7 MB      | 7.8 MB  | 10.1 MB    |
+| brakkesh    | Brakkesh     | 104   | 1        | 39        | 28,045     | 803 / 801 / 700                   | 54    | 1         | 9       | 2.9 MB  | 9.7 MB       | 12.0 MB | 8.0 MB     |
+| tideprison  | Tide Prison  | 105   | 1–4      | 54        | 28,079     | 915 / 914 / 702                   | 56    | 5         | 16      | 4.2 MB  | 10.7 MB      | 20.4 MB | —          |
+| spacecenter | Space City   | 203   | 1–2      | 48        | 23,395     | 591 / 589 / 476                   | 56    | 3         | 18      | 3.5 MB  | 10.1 MB      | 4.4 MB  | 4.2 MB     |
 
 Notes:
 
@@ -32,6 +32,9 @@ Notes:
 - **Navigation data**: encrypted navigation containers (pathfinding meshes) ship for 5 of
   the 6 maps (all but AZ3); the routing entry hides automatically when a nav container
   is not available.
+- **2D sandbox containers**: `sandbox2d.dmap` (tile pyramid + point/legend data for the
+  full-page 2D sandbox view, fetched on first entry into the 2D view) ships for 5 of the
+  6 maps; Tide Prison has no 2D sandbox data and the 2D view shows an empty state.
 - **2D layers**: includes the overview layer. Some floors have no dedicated baked image
   (e.g. Zero Dam B1 and floor 1); they fall back to the overview at runtime — this is not
   missing data.
@@ -59,7 +62,31 @@ assets/<code>/index.dmap          index container (dmap-map-manifest/3)
 
 assets/<code>/chunks/c_<x>_<y>.dmap   chunk container: single entry chunk.glb (instanced geometry)
 assets/<code>/nav.dmap                navigation container: single entry navmesh.json (nav mesh)
+assets/<code>/sandbox2d.dmap          2D sandbox container (dmap-sandbox2d-manifest/1, 5 maps)
 ```
+
+**2D sandbox container** (data source of the full-page 2D sandbox view; fully independent
+of the 3D index container):
+
+```
+sandbox2d/manifest.json    sandbox manifest: counts + meta (tileTemplate/siteFloors/floorMap/difficultyOptions)
+sandbox2d/data.json        cleaned data: regions (names in en/traditional/simplified),
+                           points (coords/floor/difficulty/name language fields/media refs),
+                           legend (57 classes: group/count/icon/color),
+                           overlays (floor overlays: anchors/size),
+                           meta.linkAffine (site pixels ↔ 3D world affine, region-level approximation)
+tiles/**                   tile pyramid (512px WebP, plain grid paths; native z1–z3, upsampled z4–6;
+                           AZ3 uses a whole-floor template tiles/{floor}/{z}/{x}/{y}.webp)
+overlays/<sha16>.webp      floor overlay images (4 maps; AZ3 has none)
+icons/index.json + *.png   legend icons (≤128px PNG, business-key indexed)
+media/index.json + *.webp  POI item images / user screenshots (≤832px WebP q75; null placeholders
+                           where the data has no reference or the upstream object is dead)
+```
+
+The 2D sandbox uses its own site-pixel coordinate space (4096², with POI and region
+annotations on two transposed axis conventions); it does not interoperate with the 3D
+baked-image calibration. Cross-view fly-to goes through `meta.linkAffine` as a
+region-level approximation.
 
 The manifest's `chunks[]` is the chunk index: container file name, byte scales
 (raw GLB / in-container payload / sealed container), instance counts and AABBs, used by
@@ -114,7 +141,9 @@ pipeline validates each map against measured content during conversion:
   are stale source rows and have been replaced by this rule.
 
 The consumer side (`apps/web/src/data/`) mirrors these keys one-to-one and is verified
-per map by the real-container regression in `apps/web/src/data/loadMap.test.ts`.
+per map by the real-container regression in `apps/web/src/data/loadMap.test.ts`; the
+same regression for the 2D sandbox containers is
+`apps/web/src/sandbox2d/loadSandbox2d.test.ts` (5 maps).
 
 ## 4. Loading behavior and failure states
 

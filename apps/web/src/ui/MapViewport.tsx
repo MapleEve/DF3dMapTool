@@ -23,8 +23,11 @@ const CAMERA_HUD_INTERVAL_MS = 200;
  * 引擎复用已解密容器做清单驱动的流式加载，相机取景/飞入由轨道相机完成。
  * three.js 引擎体量较大，按需动态加载以保证外壳首屏轻量：
  * 本组件不静态引入 three/引擎代码，仅经类型与回调对接。
+ *
+ * hidden：全页 2D 沙盘视图激活时置位——视口隐藏但保持挂载
+ * （相机/分块缓存/标注状态全保留，切回零成本恢复），渲染循环暂停以省开销。
  */
-export function MapViewport() {
+export function MapViewport({ hidden = false }: { hidden?: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const viewerReadyRef = useRef<Promise<MapViewer | null> | null>(null);
   const [viewer, setViewer] = useState<MapViewer | null>(null);
@@ -164,6 +167,19 @@ export function MapViewport() {
     viewer.sceneManager.setFrameLimit(FRAME_LIMIT_FPS[frameLimit]);
   }, [viewer, frameLimit]);
 
+  // 2D 沙盘视图激活时暂停渲染循环（场景保持挂载），切回即恢复；
+  // 飞行动画按帧间隔推进，暂停期间冻结、恢复后从原进度续播。
+  useEffect(() => {
+    if (viewer === null) {
+      return;
+    }
+    if (hidden) {
+      viewer.sceneManager.stop();
+    } else {
+      viewer.sceneManager.start();
+    }
+  }, [viewer, hidden]);
+
   // 相机设置：FOV/灵敏度即时生效；换图后相机重建，依赖地图就绪状态再次应用。
   useEffect(() => {
     if (viewer === null) {
@@ -298,7 +314,7 @@ export function MapViewport() {
   }, [viewer]);
 
   return (
-    <div className="map-viewport">
+    <div className={hidden ? "map-viewport hidden" : "map-viewport"}>
       <canvas ref={canvasRef} className="map-canvas" />
       <PoiOverlay projector={projector} />
       <MinimapHudContainer />

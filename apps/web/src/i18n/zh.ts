@@ -1,4 +1,4 @@
-/** 中文文案（默认语言）。en.ts 的结构与本文件严格同构。 */
+/** 中文文案（默认语言）。en.ts / ja.ts / ko.ts 的结构与本文件严格同构。 */
 export const zh = {
   app: {
     title: "DF3dMapTool",
@@ -31,6 +31,7 @@ export const zh = {
   poi: {
     allFloors: "全楼层",
     locate: "定位",
+    locateIn2d: "在 2D 沙盘中定位",
     navigate: "寻路",
     close: "关闭",
     noDescription: "暂无描述",
@@ -51,6 +52,9 @@ export const zh = {
     openBigmap: "大地图 (M)",
     closeBigmap: "关闭 (M)",
     toggleSidebar: "侧栏",
+    viewSwitch: "沙盘视图切换",
+    view2d: "2D 沙盘",
+    view3d: "3D 沙盘",
   },
   switcher: {
     preparing: "数据包准备中",
@@ -115,11 +119,11 @@ export const zh = {
     respawn: "回出生点",
     respawnAction: "回到进场取景位",
     airJump: "空中跳跃",
-    airJumpHint: "源站设置项对齐：当前模拟器没有角色控制，此项仅保存偏好。",
+    airJumpHint: "当前模拟器没有角色控制，此项仅保存偏好。",
     volume: "音量",
     volumeHint: "当前模拟器暂无音频输出，此项仅保存偏好。",
     ambientMotes: "环境漂浮粒子",
-    ambientMotesHint: "源站视觉开关对齐：当前场景未构建粒子系统，此项仅保存偏好。",
+    ambientMotesHint: "当前场景未构建粒子系统，此项仅保存偏好。",
     on: "开",
     off: "关",
     qualityLevels: {
@@ -140,6 +144,43 @@ export const zh = {
     unavailable: "地图数据包不存在或尚未随应用分发",
     corrupt: "地图数据包校验失败，文件可能已损坏",
     unknown: "发生未知错误",
+  },
+  // 2D 沙盘命名空间。zh 值以站点 tw 字典对应键繁→简为种（管线 sandbox2d_lang.mjs 同源转换口径）；
+  // 难度枚举/楼层标签按设计归 UI 串范畴（站点自身未翻译）。copySuccess/copyFailed 沿用站点共用文案。
+  sandbox2d: {
+    title: "2D 沙盘",
+    selectAll: "选择全部",
+    all: "全部",
+    difficulty: "难度",
+    difficultyEasy: "简单",
+    difficultyNormal: "普通",
+    floor: "楼层",
+    floorLabel: "{{floor}}F",
+    searchPlaceholder: "查找地点位置...",
+    notFound: "找不到匹配的类型",
+    noData: "找不到任何资料",
+    filterPoints: "过滤点位",
+    viewPoints: "查看点位",
+    viewOtherMaterials: "查看其他资料",
+    coordinates: "坐标",
+    copy: "复制坐标",
+    copySuccess: "复制链接成功",
+    copyFailed: "复制链接失败",
+    lastUpdated: "最后更新",
+    switchTo3d: "3D 互动地图",
+    regionLocate3d: "3D 中定位",
+    approximate: "近似位置",
+    preparing: "数据包准备中",
+    preparingNotice: "《{{map}}》数据包准备中，敬请期待",
+    retry: "重试",
+    groups: {
+      all: "全部",
+      event: "活动标记",
+      extraction: "撤离点",
+      loot: "搜索点",
+      redLoot: "大红物资",
+      spawn: "出生点",
+    },
   },
 } as const;
 

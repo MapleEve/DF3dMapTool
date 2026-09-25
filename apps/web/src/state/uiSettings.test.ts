@@ -64,7 +64,7 @@ describe("设置持久化（localStorage）", () => {
     expect(useUiStore.getState().antialias).toBe(false);
   });
 
-  it("源站对齐项（空中跳跃/音量/环境粒子）写存储且音量钳制 0..100", () => {
+  it("上游对齐项（空中跳跃/音量/环境粒子）写存储且音量钳制 0..100", () => {
     useUiStore.getState().setAirJump(false);
     expect(storage.get("df3dmaptool:airJump")).toBe("0");
     useUiStore.getState().setAmbientMotes(false);

@@ -2,6 +2,7 @@ import { create } from "zustand";
 import type { MapLoadErrorCode } from "@/data/loadMap";
 import { DEFAULT_MAP_ID, type MapId } from "@/map";
 import type { ChunkStreamStats } from "@/engine";
+import { useFloorStore } from "./floorStore";
 
 export type MapLoadStatus = "idle" | "loading" | "ready" | "error";
 
@@ -24,7 +25,7 @@ interface MapStoreState {
   notifyUnavailable: (mapId: MapId | null) => void;
 }
 
-export const useMapStore = create<MapStoreState>()((set) => ({
+export const useMapStore = create<MapStoreState>()((set, get) => ({
   mapId: DEFAULT_MAP_ID,
   status: "idle",
   errorCode: null,
@@ -32,7 +33,12 @@ export const useMapStore = create<MapStoreState>()((set) => ({
   streamStats: null,
   unavailableMapId: null,
   loadSeq: 0,
-  setMap: (mapId) =>
+  setMap: (mapId) => {
+    // 真实换图时复位 2D 沙盘的楼层值域贡献（同图位重试不动）：
+    // 沙盘数据层加载新图数据包后经 setSandboxFloors 重新回填。
+    if (mapId !== get().mapId) {
+      useFloorStore.getState().setSandboxFloors(null);
+    }
     set((state) => ({
       mapId,
       status: "idle",
@@ -41,7 +47,8 @@ export const useMapStore = create<MapStoreState>()((set) => ({
       streamStats: null,
       unavailableMapId: null,
       loadSeq: state.loadSeq + 1,
-    })),
+    }));
+  },
   setStatus: (status, errorCode = null) =>
     set((state) => ({
       status,

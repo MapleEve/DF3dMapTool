@@ -6,7 +6,11 @@ interface PoiFilterStoreState {
   hiddenCategories: readonly PoiCategoryId[];
   toggleCategory: (categoryId: PoiCategoryId) => void;
   showAllCategories: () => void;
-  hideAllCategories: () => void;
+  /**
+   * 全部隐藏：入参为当前分类 id 集（数据包派生 t<TypeId> 或内置兜底表）；
+   * 缺省回退内置表（数据未加载场景），避免只隐藏兜底分类而漏掉运行时分类。
+   */
+  hideAllCategories: (categoryIds?: readonly PoiCategoryId[]) => void;
 }
 
 export const usePoiFilterStore = create<PoiFilterStoreState>()((set) => ({
@@ -18,5 +22,6 @@ export const usePoiFilterStore = create<PoiFilterStoreState>()((set) => ({
         : [...state.hiddenCategories, categoryId],
     })),
   showAllCategories: () => set({ hiddenCategories: [] }),
-  hideAllCategories: () => set({ hiddenCategories: [...POI_CATEGORY_IDS] }),
+  hideAllCategories: (categoryIds) =>
+    set({ hiddenCategories: [...(categoryIds ?? POI_CATEGORY_IDS)] }),
 }));

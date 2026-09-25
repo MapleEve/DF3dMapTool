@@ -1,6 +1,6 @@
 import type { TranslationSchema } from "./zh";
 
-/** English resources. Must stay structurally identical to zh.ts. */
+/** English resources. Must stay structurally identical to zh.ts / ja.ts / ko.ts. */
 export const en: TranslationSchema = {
   app: {
     title: "DF3dMapTool",
@@ -33,6 +33,7 @@ export const en: TranslationSchema = {
   poi: {
     allFloors: "All floors",
     locate: "Locate",
+    locateIn2d: "Locate in 2D sandbox",
     navigate: "Route",
     close: "Close",
     noDescription: "No description yet",
@@ -53,6 +54,9 @@ export const en: TranslationSchema = {
     openBigmap: "Big map (M)",
     closeBigmap: "Close (M)",
     toggleSidebar: "Sidebar",
+    viewSwitch: "Switch sandbox view",
+    view2d: "2D Sandbox",
+    view3d: "3D Sandbox",
   },
   switcher: {
     preparing: "Data pack in preparation",
@@ -118,13 +122,12 @@ export const en: TranslationSchema = {
     respawn: "Return to spawn",
     respawnAction: "Back to entry view",
     airJump: "Air jump",
-    airJumpHint:
-      "Mirrors the original settings list: this simulator has no character controller, the preference is stored only.",
+    airJumpHint: "This simulator has no character controller; the preference is stored only.",
     volume: "Volume",
     volumeHint: "The simulator has no audio output yet; the preference is stored only.",
     ambientMotes: "Ambient motes",
     ambientMotesHint:
-      "Mirrors the original visual toggle: no particle system is built in this scene yet, the preference is stored only.",
+      "No particle system is built in this scene yet; the preference is stored only.",
     on: "On",
     off: "Off",
     qualityLevels: {
@@ -145,5 +148,42 @@ export const en: TranslationSchema = {
     unavailable: "Map data pack is missing or not shipped with the app",
     corrupt: "Map data pack failed integrity verification and may be damaged",
     unknown: "An unknown error occurred",
+  },
+  // 2D sandbox namespace. en values are seeded verbatim from the site dictionary;
+  // copySuccess/copyFailed keep the site's shared link-copy wording on purpose.
+  sandbox2d: {
+    title: "2D Sandbox",
+    selectAll: "Select All",
+    all: "All",
+    difficulty: "Difficulty",
+    difficultyEasy: "Easy",
+    difficultyNormal: "Normal",
+    floor: "Floor",
+    floorLabel: "{{floor}}F",
+    searchPlaceholder: "Find name locations...",
+    notFound: "No matching location types found",
+    noData: "No data",
+    filterPoints: "Filter Points",
+    viewPoints: "View Points",
+    viewOtherMaterials: "View other materials",
+    coordinates: "Coordinates",
+    copy: "Copy coordinates",
+    copySuccess: "Copy link success",
+    copyFailed: "Copy link failed",
+    lastUpdated: "Last updated",
+    switchTo3d: "3D Interactive Map",
+    regionLocate3d: "Locate in 3D",
+    approximate: "Approximate position",
+    preparing: "Data pack in preparation",
+    preparingNotice: "The data pack for {{map}} is in preparation — stay tuned",
+    retry: "Retry",
+    groups: {
+      all: "All",
+      event: "Event Points",
+      extraction: "Extraction Points",
+      loot: "Loot Points",
+      redLoot: "Red Loot",
+      spawn: "Spawn Points",
+    },
   },
 };
