@@ -35,27 +35,32 @@ It runs in the browser on top of three.js and ships with **built-in map data pac
 
 ## Features
 
-| Feature                      | Description                                                                                                 | Status |
-| ---------------------------- | ----------------------------------------------------------------------------------------------------------- | ------ |
-| DMAP encrypted data pack     | AES-256-GCM encryption + integrity verification (tamper-proof, deterrence-level)                            | ✅     |
-| 3D scene skeleton            | three.js scene manager, layer lifecycle, render loop                                                        | ✅     |
-| Map registry                 | MapId ↔ asset code ↔ display name, floor calibration                                                        | ✅     |
-| Coordinate transform         | Euler (Y-X-Z) → quaternion → axis mirror, applied uniformly                                                 | ✅     |
-| 2D projection                | Bidirectional world ↔ basemap pixel mapping, region display coords                                          | ✅     |
-| Four-language UI             | Full zh / en / ru / tw resources, `?lang=` override + browser-language detection                            | ✅     |
-| 3D scene & orbit camera      | Data pack → scene layers → orbit camera, floor visibility, fly-to                                           | ✅     |
-| POI layer                    | Icon rendering, hover tooltips, detail panel, filtering and search                                          | ✅     |
-| 2D overhead overlay          | Basemap drawing, floor switching, markers, zoom, region labels                                              | ✅     |
-| 2D marker teleport & minimap | 2D marker/POI → 3D fly-to teleport (cross-floor sync), HUD minimap                                          | ✅     |
-| Camera settings              | FOV / sensitivity / respawn (R key/settings: loading cover + random spawn-point landing), persisted locally | ✅     |
-| Preference: volume           | Ambient soundscape synthesized live via WebAudio (no audio assets), slider applies instantly                | ✅     |
-| Preference: ambient motes    | Scene particle layer drifting around the camera focus, toggle applies instantly                             | ✅     |
-| Preference: air jump         | Intentional difference: the orbit camera has no character jump; stored as a preference only                 | ➖     |
-| Multi-map switching          | 6-map switching, per-container cache, progress and failure states                                           | ✅     |
-| Map mode selection           | Overhead-map mode panel: POI / search / minimap filtered by in-map mode                                     | ✅     |
-| WebGL guide tip              | Degrade guidance on browsers without WebGL (2D sandbox unaffected)                                          | ✅     |
-| Navigation routes            | NavMesh pathfinding (timed crate) — wired end to end, nav data shipped for 5/6 maps (AZ3 pending)           | 🚧     |
-| Polish                       | Mobile support, performance (batching/LOD/draw distance), loading experience                                | 🚧 M4  |
+| Feature                      | Description                                                                                                                                                                              | Status |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| DMAP encrypted data pack     | AES-256-GCM encryption + integrity verification (tamper-proof, deterrence-level)                                                                                                         | ✅     |
+| 3D scene skeleton            | three.js scene manager, layer lifecycle, render loop                                                                                                                                     | ✅     |
+| Map registry                 | MapId ↔ asset code ↔ display name, floor calibration                                                                                                                                     | ✅     |
+| Coordinate transform         | Euler (Y-X-Z) → quaternion → axis mirror, applied uniformly                                                                                                                              | ✅     |
+| 2D projection                | Bidirectional world ↔ basemap pixel mapping, region display coords                                                                                                                       | ✅     |
+| Four-language UI             | Full zh / en / ru / tw resources, `?lang=` override + browser-language detection                                                                                                         | ✅     |
+| 3D scene & orbit camera      | Data pack → scene layers → orbit camera, floor visibility, fly-to                                                                                                                        | ✅     |
+| POI layer                    | Icon rendering, hover tooltips, detail panel, filtering and search                                                                                                                       | ✅     |
+| 2D overhead overlay          | Basemap drawing, floor switching, markers, zoom, region labels                                                                                                                           | ✅     |
+| 2D marker teleport & minimap | 2D marker/POI → 3D fly-to teleport (cross-floor sync), HUD minimap                                                                                                                       | ✅     |
+| Camera settings              | FOV / sensitivity / respawn (R key/settings: loading cover + random spawn-point landing), persisted locally                                                                              | ✅     |
+| Preference: volume           | Ambient soundscape synthesized live via WebAudio (no audio assets), slider applies instantly                                                                                             | ✅     |
+| Preference: ambient motes    | Scene particle layer drifting around the camera focus, toggle applies instantly                                                                                                          | ✅     |
+| Preference: air jump         | Intentional difference: the orbit camera has no character jump; stored as a preference only                                                                                              | ➖     |
+| Multi-map switching          | 6-map switching, per-container cache, progress and failure states                                                                                                                        | ✅     |
+| Map mode selection           | Overhead-map mode panel: POI / search / minimap filtered by in-map mode                                                                                                                  | ✅     |
+| WebGL guide tip              | Degrade guidance on browsers without WebGL (2D sandbox unaffected)                                                                                                                       | ✅     |
+| Route system                 | Popular route viewing (full/segment rendering, signposts), follow replay, self-recording and export — all 6 maps                                                                         | ✅     |
+| NavMesh pathfinding          | POI-triggered A* pathfinding + path HUD (worker-built, zero main-thread blocking); nav data ships for 5/6 maps — AZ3's source data has no navmesh (a data boundary, not unfinished work) | 🚧     |
+| Loading experience           | Boot screen + map loading screen (map name, big percentage, progress bar, tip rotation), hard cut when batches drain                                                                     | ✅     |
+| Instanced batching           | Chunk GLBs use GPU instancing (EXT_mesh_gpu_instancing); shared geometry/material drawn in one batch                                                                                     | ✅     |
+| Render distance              | Settings-panel slider (persisted locally); chunks stream in/out by radius + hysteresis band                                                                                              | ✅     |
+| LOD layering                 | Not implemented: chunks ship at a single detail level (frustum + distance streaming), no near/far detail tiers                                                                           | 🚧     |
+| Mobile                       | Intentional difference: desktop-first layout, no touch adaptation (virtual joystick, touch action buttons, mobile UI variants, responsive 2D all out of scope)                           | ➖     |
 
 ---
 
@@ -152,12 +157,14 @@ container layout and the data cleaning policy.
 
 - **M1 single-map core** ✅: full static AZ3 scene loading and roaming, POI icon layer, floor visibility, basemap alignment
 - **M2 core interactions** ✅: POI search/detail/fly-to teleport, full 2D overhead suite (markers/teleport/zoom/HUD minimap),
-  camera settings (FOV/sensitivity/respawn, R key lands on a random spawn point behind a loading cover). Route system and the draw-distance setting are covered
-  under M3/M4; navigation routes (NavMesh pathfinding, data ready for 5/6 maps, AZ3 pending) 🚧
-- **M3 multi-map** ✅: 6-map switching (per-container cache, progress and failure states); mode selection ✅ (mode panel + POI/search/minimap filtering); route follow with full/segment rendering and signpost guidance 🚧 (AZ3 nav data pending)
-- **M4 polish** 🚧: mobile support, performance (batching/LOD/draw distance), loading experience. The four-language UI
-  (`?lang=` + browser detection) and preference toggles (WebAudio ambience, ambient motes) are done; air jump stays an
-  intentional difference (orbit camera, no character jump — preference only)
+  camera settings (FOV/sensitivity/respawn, R key lands on a random spawn point behind a loading cover). The route system is
+  covered under M3; the draw-distance setting and other performance items under M4
+- **M3 multi-map** ✅: 6-map switching (per-container cache, progress and failure states); mode selection ✅ (mode panel + POI/search/minimap filtering); route system ✅ (viewing/follow/self-recording, 6/6 maps); NavMesh pathfinding 🚧 (nav data ships for 5/6 maps; AZ3's source data has no navmesh — a data boundary, not unfinished work)
+- **M4 polish** 🚧: mostly delivered — loading experience ✅, instanced batching ✅, render distance ✅;
+  LOD layering 🚧 not implemented. The four-language UI (`?lang=` + browser detection) and preference toggles
+  (WebAudio ambience, ambient motes) are done; mobile stays an intentional difference (desktop-first layout,
+  touch adaptation out of scope); air jump stays an intentional difference (orbit camera, no character jump —
+  preference only)
 
 ---
 
