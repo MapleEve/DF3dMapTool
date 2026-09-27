@@ -348,25 +348,42 @@ describe("真实分片数据包（az3/index.dmap，本仓内置资产）", () =>
       expect(pkg.mapId).toBe(106);
       expect(pkg.mapCode).toBe("az3");
       expect(pkg.floors).toEqual([1, 2, 3]);
-      expect(pkg.manifest.format).toBe("dmap-map-manifest/3");
+      expect(pkg.manifest.format).toBe("dmap-map-manifest/4");
       expect(pkg.manifest.counts.chunks).toBe(96);
       expect(pkg.manifest.counts.instances).toBe(45595);
 
       const chunks = pkg.manifest.chunks;
       expect(chunks.length).toBeGreaterThan(50);
-      // 分块文件名约定：c_<x>_<y>.dmap。
-      expect(chunks[0]?.file).toMatch(/^chunks\/c_-?\d+_-?\d+\.dmap$/);
+      // 分块文件名约定（v4 分层）：c_<x>_<y>_l0.dmap，顶层 file = 最高细节层。
+      expect(chunks[0]?.file).toMatch(/^chunks\/c_-?\d+_-?\d+_l0\.dmap$/);
+      // 逐层表：三层、层级 0/1/2、文件名随 id、实例数跨层一致、梯度单调。
+      const first = chunks[0]!;
+      const lods = first.lods!;
+      expect(lods.map((lod) => lod.level)).toEqual([0, 1, 2]);
+      expect(lods.map((lod) => lod.file)).toEqual(
+        [0, 1, 2].map((level) => `chunks/c_${first.id}_l${level}.dmap`),
+      );
+      for (const lod of lods) {
+        expect(lod.instances).toBe(chunks[0]!.instances);
+      }
+      expect(lods[0]!.vertices).toBeGreaterThanOrEqual(lods[1]!.vertices);
+      expect(lods[1]!.vertices).toBeGreaterThanOrEqual(lods[2]!.vertices);
 
       const sceneDoc = readSceneDoc(pkg);
       expect(sceneDoc.floorValues).toEqual([1, 2, 3]);
       expect(sceneDoc.floorTriggers.length).toBeGreaterThan(3);
       expect(sceneDoc.bounds.min[0]).toBeLessThan(sceneDoc.bounds.max[0]);
 
-      // 分块 GLB 字节：长度与清单一致、GLB magic 正确。
-      const first = chunks[0]!;
+      // 分块 GLB 字节：长度与清单一致、GLB magic 正确（readChunk = 最高细节层）。
       const glb = await pkg.readChunk(first);
       expect(glb.byteLength).toBe(first.bytesCompressed);
       expect(String.fromCharCode(glb[0], glb[1], glb[2], glb[3])).toBe("glTF");
+
+      // 按层读取：低细节层容器同为合法 GLB 载荷且不大于 l0 载荷。
+      const lod2 = await pkg.readChunkLod(first, 2);
+      expect(String.fromCharCode(lod2[0], lod2[1], lod2[2], lod2[3])).toBe("glTF");
+      expect(lod2.byteLength).toBe(lods[2]!.bytesCompressed);
+      expect(lod2.byteLength).toBeLessThanOrEqual(glb.byteLength);
       pkg.dispose();
     },
     30000,

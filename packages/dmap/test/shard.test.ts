@@ -5,9 +5,11 @@ import {
   DmapMapPackage,
   DmapWriter,
   parseMapManifest,
+  chunkLodFile,
   CHUNK_ENTRY_NAME,
   MAP_MANIFEST_ENTRY,
-  MAP_MANIFEST_FORMAT,
+  MAP_MANIFEST_FORMAT_V3,
+  MAP_MANIFEST_FORMAT_V4,
   type DmapKeyMaterial,
   type DmapMapManifest,
 } from "../src/index.js";
@@ -22,10 +24,10 @@ const KEY_MATERIAL: DmapKeyMaterial = {
   ),
 };
 
-/** 与真实分片包同构的合成清单（2 个分块）。 */
+/** 与真实分片包同构的合成清单（2 个分块，v3 单层）。 */
 function syntheticManifest(): DmapMapManifest {
   return {
-    format: MAP_MANIFEST_FORMAT,
+    format: MAP_MANIFEST_FORMAT_V3,
     map: { mapId: 901, code: "testmap" },
     floors: [1, 2],
     counts: { chunks: 2, instances: 5, vertices: 30, triangles: 10, geometries: 2, pois: 3 },
@@ -68,6 +70,39 @@ function syntheticManifest(): DmapMapManifest {
   };
 }
 
+/**
+ * v4 合成清单：chunk 0 带三层 lods 表（顶点/三角形沿层递减），
+ * chunk 1 与 v3 同构（v4 下 lods 为必填，故同样补表）。
+ */
+function syntheticLodManifest() {
+  const manifest = syntheticManifest() as DmapMapManifest & {
+    chunks: { lods?: unknown[] }[];
+  };
+  manifest.format = MAP_MANIFEST_FORMAT_V4;
+  manifest.chunks = manifest.chunks.map((chunk) => {
+    const scale = (level: number) => ({
+      level,
+      file: `chunks/c_${chunk.id}_l${level}.dmap`,
+      generated: level > 0,
+      instances: chunk.instances,
+      vertices: Math.max(1, Math.round(chunk.vertices / (level + 1))),
+      triangles: Math.max(1, Math.round(chunk.triangles / (level + 1))),
+      geometries: chunk.geometries,
+      bytes: Math.max(1, Math.round(chunk.bytes / (level + 1))),
+      bytesCompressed: Math.max(1, Math.round(chunk.bytesCompressed / (level + 1))),
+      containerBytes: 200,
+      boundsMin: chunk.boundsMin,
+      boundsMax: chunk.boundsMax,
+    });
+    return {
+      ...chunk,
+      file: `chunks/c_${chunk.id}_l0.dmap`,
+      lods: [scale(0), scale(1), scale(2)],
+    };
+  });
+  return manifest;
+}
+
 /** 打一个最小索引容器（清单 + scene/poi JSON）。 */
 async function buildIndexBytes(manifest: unknown): Promise<Uint8Array> {
   return DmapWriter.create()
@@ -88,18 +123,93 @@ async function buildChunkBytes(glb: Uint8Array): Promise<Uint8Array> {
   return DmapWriter.create().add(CHUNK_ENTRY_NAME, "model/gltf-binary", glb).write(KEY_MATERIAL);
 }
 
-describe("parseMapManifest（dmap-map-manifest/3）", () => {
-  it("解析合法清单", () => {
+describe("parseMapManifest（dmap-map-manifest/3 与 /4）", () => {
+  it("解析合法 v3 清单（单层：无 lods 表）", () => {
     const manifest = parseMapManifest(syntheticManifest());
-    expect(manifest.format).toBe(MAP_MANIFEST_FORMAT);
+    expect(manifest.format).toBe(MAP_MANIFEST_FORMAT_V3);
     expect(manifest.map).toEqual({ mapId: 901, code: "testmap" });
     expect(manifest.chunks).toHaveLength(2);
     expect(manifest.chunks[1]?.file).toBe("chunks/c_1_0.dmap");
+    expect(manifest.chunks[0]?.lods).toBeUndefined();
+  });
+
+  it("解析合法 v4 清单（逐层 lods 表：层级递增、字段齐全）", () => {
+    const manifest = parseMapManifest(syntheticLodManifest());
+    expect(manifest.format).toBe(MAP_MANIFEST_FORMAT_V4);
+    const lods = manifest.chunks[0]!.lods!;
+    expect(lods.map((lod) => lod.level)).toEqual([0, 1, 2]);
+    expect(lods[0]!.file).toBe("chunks/c_0_0_l0.dmap");
+    expect(lods[1]!.generated).toBe(true);
+    expect(lods[0]!.generated).toBe(false);
+    // 顶层规模字段与 level 0 同口径（合成数据保证）。
+    expect(manifest.chunks[0]!.vertices).toBe(lods[0]!.vertices);
+  });
+
+  it("v4 缺少/损坏 lods 表抛 bad_manifest", () => {
+    const lod = syntheticLodManifest();
+    expect(() => parseMapManifest({ ...lod, chunks: [{ ...lod.chunks[0]!, lods: [] }] })).toThrow(
+      /lods/,
+    );
+    expect(() => {
+      const noLods = syntheticLodManifest();
+      const { lods: _drop, ...bare } = noLods.chunks[0]!;
+      parseMapManifest({ ...noLods, chunks: [bare, noLods.chunks[1]!] });
+    }).toThrow(/lods/);
+    expect(() =>
+      parseMapManifest({
+        ...lod,
+        chunks: [
+          {
+            ...lod.chunks[0]!,
+            lods: lod.chunks[0]!.lods!.map((entry) => ({ ...entry, level: entry.level + 1 })),
+          },
+          lod.chunks[1]!,
+        ],
+      }),
+    ).toThrow(/level 0/);
+    expect(() =>
+      parseMapManifest({
+        ...lod,
+        chunks: [
+          {
+            ...lod.chunks[0]!,
+            lods: lod.chunks[0]!.lods!.map((entry, index) =>
+              index === 2 ? { ...entry, level: 1 } : entry,
+            ),
+          },
+          lod.chunks[1]!,
+        ],
+      }),
+    ).toThrow(/严格递增/);
+    expect(() =>
+      parseMapManifest({
+        ...lod,
+        chunks: [
+          {
+            ...lod.chunks[0]!,
+            lods: lod.chunks[0]!.lods!.map((entry) => ({ ...entry, file: "" })),
+          },
+          lod.chunks[1]!,
+        ],
+      }),
+    ).toThrow(/file/);
+    expect(() =>
+      parseMapManifest({
+        ...lod,
+        chunks: [
+          {
+            ...lod.chunks[0]!,
+            lods: lod.chunks[0]!.lods!.map((entry) => ({ ...entry, generated: "yes" })),
+          },
+          lod.chunks[1]!,
+        ],
+      }),
+    ).toThrow(/generated/);
   });
 
   it("格式标识/结构不符抛 bad_manifest", () => {
     expect(() => parseMapManifest({ format: "dmap-map-manifest/2", maps: [] })).toThrow(/format/);
-    expect(() => parseMapManifest({ format: MAP_MANIFEST_FORMAT })).toThrow(/map/);
+    expect(() => parseMapManifest({ format: MAP_MANIFEST_FORMAT_V4 })).toThrow(/map/);
     expect(() => parseMapManifest({ ...syntheticManifest(), floors: [] })).toThrow(/floors/);
     expect(() => parseMapManifest({ ...syntheticManifest(), chunks: [] })).toThrow(/chunks/);
     expect(() =>
@@ -108,6 +218,22 @@ describe("parseMapManifest（dmap-map-manifest/3）", () => {
         chunks: [{ ...syntheticManifest().chunks[0]!, id: "" }],
       }),
     ).toThrow(/id/);
+  });
+});
+
+describe("chunkLodFile（层级 → 容器路径）", () => {
+  it("v4：命中同层；超出表范围取最接近的更细层", () => {
+    const chunk = syntheticLodManifest().chunks[0]!;
+    expect(chunkLodFile(chunk, 0)).toBe("chunks/c_0_0_l0.dmap");
+    expect(chunkLodFile(chunk, 2)).toBe("chunks/c_0_0_l2.dmap");
+    expect(chunkLodFile(chunk, 9)).toBe("chunks/c_0_0_l2.dmap");
+  });
+
+  it("v3（无 lods 表）：任意层级回落 file", () => {
+    const chunk = syntheticManifest().chunks[0]!;
+    expect(chunkLodFile(chunk, 0)).toBe("chunks/c_0_0.dmap");
+    expect(chunkLodFile(chunk, 2)).toBe("chunks/c_0_0.dmap");
+    expect(chunkLodFile({ file: "chunks/c_0_0.dmap", lods: [] }, 1)).toBe("chunks/c_0_0.dmap");
   });
 });
 
@@ -232,5 +358,69 @@ describe("DmapMapPackage 分片往返", () => {
     const names = pkg.listEntries().map((entry) => entry.name);
     expect(names).toContain(MAP_MANIFEST_ENTRY);
     expect(names).toContain("maps/testmap/scene.json");
+  });
+});
+
+describe("DmapMapPackage 分层读取（dmap-map-manifest/4）", () => {
+  it("readChunkLod 按层拉取对应容器；各层独立缓存、互不挤占", async () => {
+    const manifest = syntheticLodManifest();
+    const tierBytes = {
+      0: new Uint8Array([1, 1, 1]),
+      1: new Uint8Array([2, 2]),
+      2: new Uint8Array([3]),
+    } as const;
+    const containers = new Map<string, Uint8Array>();
+    for (const chunk of manifest.chunks) {
+      for (const lod of chunk.lods!) {
+        containers.set(lod.file, await buildChunkBytes(tierBytes[lod.level as 0 | 1 | 2]!));
+      }
+    }
+    const fetchContainer = vi.fn(async (file: string) => {
+      const bytes = containers.get(file);
+      if (bytes === undefined) {
+        throw new Error(`fetch 桩未配置: ${file}`);
+      }
+      return bytes;
+    });
+    const indexBytes = await buildIndexBytes(manifest);
+    const pkg = await DmapMapPackage.openIndex(indexBytes, KEY_MATERIAL, { fetchContainer });
+    const chunk = pkg.manifest.chunks[0]!;
+
+    // 逐层读取：载荷与层容器一一对应。
+    await expect(pkg.readChunkLod(chunk, 0)).resolves.toEqual(tierBytes[0]);
+    await expect(pkg.readChunkLod(chunk, 1)).resolves.toEqual(tierBytes[1]);
+    await expect(pkg.readChunkLod(chunk, 2)).resolves.toEqual(tierBytes[2]);
+    expect(fetchContainer.mock.calls.map(([file]) => file)).toEqual([
+      "chunks/c_0_0_l0.dmap",
+      "chunks/c_0_0_l1.dmap",
+      "chunks/c_0_0_l2.dmap",
+    ]);
+
+    // 层容器按文件缓存：重复读同层不重新拉取；换层复用各自缓存。
+    await expect(pkg.readChunkLod(chunk, 0)).resolves.toEqual(tierBytes[0]);
+    await expect(pkg.readChunkLod(chunk, 2)).resolves.toEqual(tierBytes[2]);
+    expect(fetchContainer).toHaveBeenCalledTimes(3);
+    expect(pkg.cachedChunkCount).toBe(3);
+
+    // 超出表的层级号贴最接近的更细层（clamp 到 level 2）。
+    await expect(pkg.readChunkLod(chunk, 7)).resolves.toEqual(tierBytes[2]);
+    expect(fetchContainer).toHaveBeenCalledTimes(3);
+
+    // readChunk 仍读最高细节层（chunks[].file = l0 容器）。
+    await expect(pkg.readChunk(chunk)).resolves.toEqual(tierBytes[0]);
+    expect(fetchContainer).toHaveBeenCalledTimes(3);
+    pkg.dispose();
+  });
+
+  it("v3 单层包：readChunkLod 任意层级回落 file", async () => {
+    const glb = new Uint8Array([5, 5, 5, 5]);
+    const chunkBytes = await buildChunkBytes(glb);
+    const indexBytes = await buildIndexBytes(syntheticManifest());
+    const fetchContainer = vi.fn(async () => chunkBytes);
+    const pkg = await DmapMapPackage.openIndex(indexBytes, KEY_MATERIAL, { fetchContainer });
+    const chunk = pkg.manifest.chunks[0]!;
+    await expect(pkg.readChunkLod(chunk, 2)).resolves.toEqual(glb);
+    expect(fetchContainer).toHaveBeenCalledWith("chunks/c_0_0.dmap");
+    pkg.dispose();
   });
 });

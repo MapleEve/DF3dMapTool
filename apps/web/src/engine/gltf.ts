@@ -1,4 +1,4 @@
-import { type BufferGeometry, InstancedMesh, type Material, type Object3D } from "three";
+import { type BufferGeometry, InstancedMesh, type Material, type Object3D, Texture } from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { DRACO_GLTF_CONFIG, DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import type { FloorBand } from "./floorBands";
@@ -47,9 +47,26 @@ export class ChunkGltfParser {
   }
 }
 
+/** 材质上可能出现的纹理槽位（释放材质时一并释放其纹理引用）。 */
+const MATERIAL_TEXTURE_SLOTS = [
+  "map",
+  "alphaMap",
+  "aoMap",
+  "bumpMap",
+  "displacementMap",
+  "emissiveMap",
+  "envMap",
+  "lightMap",
+  "metalnessMap",
+  "normalMap",
+  "roughnessMap",
+  "specularMap",
+] as const;
+
 /**
- * 释放一个对象子树的 GPU 资源：几何体、材质、实例属性。
- * 材质可能被同子树多个网格共享，先去重再逐个释放。
+ * 释放一个对象子树的 GPU 资源：几何体、材质（含纹理槽位）、实例属性。
+ * 材质可能被同子树多个网格共享，先去重再逐个释放；纹理同理
+ * （GLB 内材质间可共享同一纹理对象，重复 dispose 无害）。
  */
 export function disposeObject3D(root: Object3D): void {
   const materials = new Set<Material>();
@@ -72,6 +89,12 @@ export function disposeObject3D(root: Object3D): void {
     }
   });
   for (const material of materials) {
+    for (const slot of MATERIAL_TEXTURE_SLOTS) {
+      const texture = (material as unknown as Record<string, unknown>)[slot];
+      if (texture instanceof Texture) {
+        texture.dispose();
+      }
+    }
     material.dispose();
   }
 }

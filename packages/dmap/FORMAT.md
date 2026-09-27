@@ -85,25 +85,28 @@ AES-256 密钥不由明文形式存放，而是拆成 4 段密钥材料分发：
 - `version` 字段单调递增；加载器只接受自己支持的版本集合（当前为 1）。
 - `flags` 位段用于向后兼容的可选特性，未识别位应忽略。
 
-## 6. 分片地图包（dmap-map-manifest/3）
+## 6. 分片地图包（dmap-map-manifest/3 与 /4）
 
 一张地图不再打成单个大容器，而是按内容拆为一组独立容器，随应用静态分发：
 
 ```
 assets/<code>/
-  index.dmap                索引容器：清单 + POI/配置/图标/2D 标定（先到先渲染 UI）
-  chunks/c_<x>_<y>.dmap     分块容器：一个 3D 分块一个小容器（GLB 载荷）
-  nav.dmap                  导航容器（可选）：寻路网格，独立加载
+  index.dmap                     索引容器：清单 + POI/配置/图标/2D 标定（先到先渲染 UI）
+  chunks/c_<x>_<y>_l<N>.dmap     分块容器：一个 3D 分块 × 一个细节层一个小容器（GLB 载荷）
+  nav.dmap                       导航容器（可选）：寻路网格，独立加载
 ```
+
+v3 包的分块容器不带层级后缀（`chunks/c_<x>_<y>.dmap`，单细节层）；
+v4 包按细节层拆为多个容器，`<N>` 为层级号（0 = 最高细节）。
 
 ### 6.1 索引容器
 
 索引容器是一个标准 DMAP 容器（§1–§4），固定携带 `manifest.json` 条目，
-即 **dmap-map-manifest/3 清单**：
+即 **dmap-map-manifest/4 清单**（v3 为其去掉 `lods` 字段的子集）：
 
 ```json
 {
-  "format": "dmap-map-manifest/3",
+  "format": "dmap-map-manifest/4",
   "map": { "mapId": 106, "code": "az3" },
   "floors": [1, 2, 3],
   "counts": {
@@ -125,7 +128,7 @@ assets/<code>/
   "chunks": [
     {
       "id": "-25_-15",
-      "file": "chunks/c_-25_-15.dmap",
+      "file": "chunks/c_-25_-15_l0.dmap",
       "instances": 1,
       "vertices": 947,
       "triangles": 532,
@@ -134,7 +137,37 @@ assets/<code>/
       "bytesCompressed": 8192,
       "containerBytes": 8240,
       "boundsMin": [-3181.8, -45.2, -1952.0],
-      "boundsMax": [-3092.2, 44.2, -1862.4]
+      "boundsMax": [-3092.2, 44.2, -1862.4],
+      "lods": [
+        {
+          "level": 0,
+          "file": "chunks/c_-25_-15_l0.dmap",
+          "generated": false,
+          "instances": 1,
+          "vertices": 947,
+          "triangles": 532,
+          "geometries": 1,
+          "bytes": 30744,
+          "bytesCompressed": 8192,
+          "containerBytes": 8240,
+          "boundsMin": [-3181.8, -45.2, -1952.0],
+          "boundsMax": [-3092.2, 44.2, -1862.4]
+        },
+        {
+          "level": 1,
+          "file": "chunks/c_-25_-15_l1.dmap",
+          "generated": true,
+          "instances": 1,
+          "vertices": 300,
+          "triangles": 160,
+          "geometries": 1,
+          "bytes": 9000,
+          "bytesCompressed": 3000,
+          "containerBytes": 3048,
+          "boundsMin": [-3181.8, -45.2, -1952.0],
+          "boundsMax": [-3092.2, 44.2, -1862.4]
+        }
+      ]
     }
   ]
 }
@@ -146,20 +179,35 @@ assets/<code>/
   实例数与 AABB，供引擎按需加载、取景与进度聚合；
 - 清单解析由 `parseMapManifest` 完成，字段缺失/类型不符抛 `bad_manifest`。
 
-### 6.2 分块容器与导航容器
+### 6.2 LOD 分层（v4）
+
+- `chunks[]` 顶层规模字段恒为 **level 0（最高细节层）口径**，
+  `file` 指向 level 0 容器；`chunks[].lods[]` 为逐层容器表；
+- `lods[]` 每条含 `level`（自 0 起严格递增的层级号）、容器 `file` 与该层的
+  规模字段（字段集与顶层一致，另加 `generated` 标记该层是否为管线生成的
+  降细节层）；
+- **实例数跨层一致**（同一分块各层实例化同一组摆放），顶点/三角形沿层级
+  递增单调不增；空层（简化后无可渲染几何，仅剩实例化节点）的包围盒
+  沿用 level 0 口径——分块的空间足迹不随层级变化；
+- 层容器路径解析由 `chunkLodFile(chunk, level)` 完成：无 `lods` 表（v3 单层包）
+  时任意层级均回落 `chunk.file`，请求层级超出表范围时取最接近的更细层；
+- 加载侧的距离分带（远取粗层、近取细层）属引擎策略，不在容器格式范围内。
+
+### 6.3 分块容器与导航容器
 
 - 每个分块容器固定只含一个条目 `chunk.glb`（`model/gltf-binary`），
-  即该分块的实例化 GLB 几何；
+  即该分块该细节层的实例化 GLB 几何；
 - 导航容器固定只含 `navmesh.json`；无导航数据的地图不随包分发。
 
-### 6.3 两段式加载流程（`DmapMapPackage`）
+### 6.4 两段式加载流程（`DmapMapPackage`）
 
 1. **第一段（index 先开）**：宿主拉取 `index.dmap` 字节 →
    `DmapMapPackage.openIndex(bytes, keySource, { fetchContainer })`：
    完成容器头校验、解密、清单解析——POI/配置/图标/2D 标定立即可读，UI 先行渲染；
-2. **第二段（分块按名惰性开）**：`readChunk(chunk)` 以清单 `chunks[].file`
-   经宿主注入的 `fetchContainer` 拉取分块容器并解密校验，
-   成功打开的容器常驻缓存；打开失败不缓存，重试会重新拉取字节。
+2. **第二段（分块按名惰性开）**：`readChunk(chunk)` / `readChunkLod(chunk, level)`
+   以清单中的容器文件名经宿主注入的 `fetchContainer` 拉取分块容器并解密校验，
+   成功打开的容器按文件常驻缓存；打开失败不缓存，重试会重新拉取字节。
+   v4 各层容器为独立文件，缓存互不挤占：细节层升/降级时已打开的层直接复用。
 
 分块的并行调度由 `TaskPool` 承担：按优先级（典型为到视线中心的距离）排序、
 并发上限限流、失败自动重试（默认附加 1 次）；跨流进度由

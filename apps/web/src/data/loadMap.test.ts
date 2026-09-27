@@ -350,6 +350,62 @@ describe("loadMapBundle · 随仓真实分片数据包（6 图）", () => {
     });
   }
 
+  /**
+   * v4 分层表回归（LOD 分层加载）：六图逐 chunk 校验 lods 表结构、
+   * 梯度单调性、跨层实例数一致、l0 与顶层规模同口径、层容器文件在盘。
+   * 计数/楼层/POI 回归由「Batch2 基线」用例锁定，此处覆盖分层增量。
+   */
+  for (const [mapId, code] of MAPS.map((definition) => [definition.id, definition.code] as const)) {
+    it(`v4 分层表：三层容器齐全、梯度单调、实例跨层一致（${mapId} / ${code}）`, async () => {
+      const bundle = await loadMapBundle(mapId);
+      expect(bundle.manifest.format).toBe("dmap-map-manifest/4");
+      let sumLodPayload = 0;
+      for (const chunk of bundle.manifest.chunks) {
+        const lods = chunk.lods;
+        expect(lods, chunk.id).toBeDefined();
+        expect(
+          lods!.map((lod) => lod.level),
+          chunk.id,
+        ).toEqual([0, 1, 2]);
+        // 层容器文件名随 chunk id，且全部在盘。
+        for (const lod of lods!) {
+          expect(lod.file, `${chunk.id} l${lod.level}`).toBe(
+            `chunks/c_${chunk.id}_l${lod.level}.dmap`,
+          );
+          expect(existsSync(assetPath(code, lod.file)), lod.file).toBe(true);
+          expect(statSync(assetPath(code, lod.file)).size, lod.file).toBe(lod.containerBytes);
+          sumLodPayload += lod.bytesCompressed;
+        }
+        // 实例数跨层一致（= 顶层声明）；顶点/三角形沿层级单调不增。
+        for (const lod of lods!) {
+          expect(lod.instances, `${chunk.id} l${lod.level}`).toBe(chunk.instances);
+        }
+        expect(lods![0]!.vertices, chunk.id).toBeGreaterThanOrEqual(lods![1]!.vertices);
+        expect(lods![1]!.vertices, chunk.id).toBeGreaterThanOrEqual(lods![2]!.vertices);
+        expect(lods![0]!.triangles, chunk.id).toBeGreaterThanOrEqual(lods![1]!.triangles);
+        expect(lods![1]!.triangles, chunk.id).toBeGreaterThanOrEqual(lods![2]!.triangles);
+        // l0 = 顶层规模口径（file/vertices/triangles/geometries/字节）。
+        expect(lods![0]!.file, chunk.id).toBe(chunk.file);
+        expect(lods![0]!.vertices, chunk.id).toBe(chunk.vertices);
+        expect(lods![0]!.triangles, chunk.id).toBe(chunk.triangles);
+        expect(lods![0]!.geometries, chunk.id).toBe(chunk.geometries);
+        expect(lods![0]!.bytesCompressed, chunk.id).toBe(chunk.bytesCompressed);
+        // l1/l2 为管线生成层。
+        expect(lods![1]!.generated, chunk.id).toBe(true);
+        expect(lods![2]!.generated, chunk.id).toBe(true);
+        // 层级只减不减显存语义：粗层容器不大于细层容器。
+        expect(lods![1]!.containerBytes, chunk.id).toBeLessThanOrEqual(lods![0]!.containerBytes);
+        expect(lods![2]!.containerBytes, chunk.id).toBeLessThanOrEqual(lods![1]!.containerBytes);
+      }
+      // 抽一个低细节层容器读回：合法 GLB、载荷字节与层声明一致。
+      const sample = bundle.manifest.chunks[0]!;
+      const lod2 = await bundle.pkg.readChunkLod(sample, 2);
+      expect(String.fromCharCode(lod2[0], lod2[1], lod2[2], lod2[3])).toBe("glTF");
+      expect(lod2.byteLength).toBe(sample.lods![2]!.bytesCompressed);
+      expect(sumLodPayload).toBeGreaterThan(0);
+    });
+  }
+
   it("跨图缓存：6 图加载后重复请求不触发新的 fetch", async () => {
     for (const definition of MAPS) {
       await loadMapBundle(definition.id);

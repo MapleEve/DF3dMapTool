@@ -35,6 +35,8 @@ export { DmapWriter } from "./writer.js";
 export type { DmapEntryInfo } from "./loader.js";
 export { DmapLoader } from "./loader.js";
 export type {
+  DmapChunkLodRef,
+  DmapChunkLodSource,
   DmapChunkRef,
   DmapMapCounts,
   DmapMapManifest,
@@ -44,6 +46,10 @@ export {
   CHUNK_ENTRY_NAME,
   MAP_MANIFEST_ENTRY,
   MAP_MANIFEST_FORMAT,
+  MAP_MANIFEST_FORMAT_V3,
+  MAP_MANIFEST_FORMAT_V4,
+  SUPPORTED_MAP_MANIFEST_FORMATS,
+  chunkLodFile,
   parseMapManifest,
 } from "./manifest.js";
 export type { DmapMapPackageOptions } from "./shard.js";

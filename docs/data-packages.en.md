@@ -13,20 +13,25 @@ takes — no extra downloads or generation steps.
 The table below reflects the actual scale of the 6 shipped maps, inventoried from each
 index container's manifest and JSON configs:
 
-| Code        | Map          | MapId | Floors   | 3D chunks | Placements | POIs (total / active / with icon) | Icons | 2D layers | Regions | Index   | Chunks total | Nav     | 2D sandbox |
-| ----------- | ------------ | ----- | -------- | --------- | ---------- | --------------------------------- | ----- | --------- | ------- | ------- | ------------ | ------- | ---------- |
-| az3         | AZ3          | 106   | 1–3      | 96        | 45,595     | 146 / 146 / 146                   | 34    | 4         | 13      | 15.8 MB | 18.8 MB      | —       | 5.0 MB     |
-| damiris     | Zero Dam     | 101   | B1, 1, 2 | 76        | 42,830     | 557 / 553 / 480                   | 55    | 2         | 6       | 2.6 MB  | 15.2 MB      | 13.8 MB | 7.4 MB     |
-| forrest     | Layali Grove | 102   | 1        | 139       | 52,472     | 688 / 473 / 620                   | 54    | 1         | 14      | 2.5 MB  | 22.7 MB      | 7.8 MB  | 10.1 MB    |
-| brakkesh    | Brakkesh     | 104   | 1        | 39        | 28,045     | 803 / 801 / 700                   | 54    | 1         | 9       | 2.9 MB  | 9.7 MB       | 12.0 MB | 8.0 MB     |
-| tideprison  | Tide Prison  | 105   | 1–4      | 54        | 28,079     | 915 / 914 / 702                   | 56    | 5         | 16      | 4.2 MB  | 10.7 MB      | 20.4 MB | —          |
-| spacecenter | Space City   | 203   | 1–2      | 48        | 23,395     | 591 / 589 / 476                   | 56    | 3         | 18      | 3.5 MB  | 10.1 MB      | 4.4 MB  | 4.2 MB     |
+| Code        | Map          | MapId | Floors   | 3D chunks | Placements | POIs (total / active / with icon) | Icons | 2D layers | Regions | Index   | Chunks total (top tier) | Nav     | 2D sandbox |
+| ----------- | ------------ | ----- | -------- | --------- | ---------- | --------------------------------- | ----- | --------- | ------- | ------- | ----------------------- | ------- | ---------- |
+| az3         | AZ3          | 106   | 1–3      | 96        | 45,595     | 146 / 146 / 146                   | 34    | 4         | 13      | 15.9 MB | 71.9 MB (30.3 MB)       | —       | 5.0 MB     |
+| damiris     | Zero Dam     | 101   | B1, 1, 2 | 76        | 42,830     | 557 / 553 / 480                   | 55    | 2         | 6       | 2.7 MB  | 55.4 MB (23.4 MB)       | 13.8 MB | 7.4 MB     |
+| forrest     | Layali Grove | 102   | 1        | 139       | 52,472     | 688 / 473 / 620                   | 54    | 1         | 14      | 2.6 MB  | 82.4 MB (34.0 MB)       | 7.8 MB  | 10.1 MB    |
+| brakkesh    | Brakkesh     | 104   | 1        | 39        | 28,045     | 803 / 801 / 700                   | 54    | 1         | 9       | 2.9 MB  | 37.2 MB (15.3 MB)       | 12.0 MB | 8.0 MB     |
+| tideprison  | Tide Prison  | 105   | 1–4      | 54        | 28,079     | 915 / 914 / 702                   | 56    | 5         | 16      | 4.2 MB  | 42.4 MB (18.8 MB)       | 20.4 MB | —          |
+| spacecenter | Space City   | 203   | 1–2      | 48        | 23,395     | 591 / 589 / 476                   | 56    | 3         | 18      | 3.5 MB  | 37.5 MB (15.3 MB)       | 4.4 MB  | 4.2 MB     |
 
 Notes:
 
 - **Sharded layout**: each map lives in one directory `assets/<code>/` containing
-  `index.dmap` (index container), `chunks/c_<x>_<y>.dmap` (one container per chunk)
-  and `nav.dmap` (navigation container, optional). Every single file stays below 90 MB.
+  `index.dmap` (index container), `chunks/c_<x>_<y>_l<N>.dmap` (one container per
+  chunk per detail tier, `_l0` = highest detail) and `nav.dmap` (navigation container,
+  optional). Every single file stays below 90 MB.
+- **LOD tiers**: every 3D chunk ships as three detail containers (`l0` original geometry,
+  `l1`/`l2` decimated tiers) listed in the manifest's `chunks[].lods` table; the engine
+  picks a tier per chunk by view distance (fine near, coarse far). "Chunks total" above is
+  the three-tier sum — at runtime only the required tiers of the current view are fetched.
 - **Floors**: the 3D scene and floor tabs follow the index container manifest's `floors`;
   the values match the static registry.
 - **Navigation data**: encrypted navigation containers (pathfinding meshes) ship for 5 of
@@ -51,8 +56,9 @@ Notes:
 Each map's data is split into three groups of independent DMAP containers:
 
 ```
-assets/<code>/index.dmap          index container (dmap-map-manifest/3)
+assets/<code>/index.dmap          index container (dmap-map-manifest/4)
   manifest.json                   per-map manifest: map/floors/counts/entries + chunks index
+                                  (v4: chunks[].lods per-tier table; top-level fields = l0)
   maps/<code>/scene.json          floor values, scene bounds, floor triggers
   maps/<code>/poi.json            full POI list (coords, floors, icons, visibility)
   maps/<code>/map2d.json          per-floor 2D calibration (world extents ↔ pixels)
@@ -60,9 +66,10 @@ assets/<code>/index.dmap          index container (dmap-map-manifest/3)
   icons/                          icon index and PNGs (hash file names)
   minimap/                        basemap index and PNGs (hash file names)
 
-assets/<code>/chunks/c_<x>_<y>.dmap   chunk container: single entry chunk.glb (instanced geometry)
-assets/<code>/nav.dmap                navigation container: single entry navmesh.json (nav mesh)
-assets/<code>/sandbox2d.dmap          2D sandbox container (dmap-sandbox2d-manifest/1, 5 maps)
+assets/<code>/chunks/c_<x>_<y>_l<N>.dmap   chunk container: single entry chunk.glb (instanced geometry)
+                                           (N = detail tier, 0 = highest; v3 packs ship one tier, no suffix)
+assets/<code>/nav.dmap                     navigation container: single entry navmesh.json (nav mesh)
+assets/<code>/sandbox2d.dmap               2D sandbox container (dmap-sandbox2d-manifest/1, 5 maps)
 ```
 
 **2D sandbox container** (data source of the full-page 2D sandbox view; fully independent
@@ -150,11 +157,18 @@ same regression for the 2D sandbox containers is
 - **Two-stage loading**: switching maps fetches only the index container (a few MB;
   progress 0 → UI ready) — POI/2D/config data renders with the index; 3D chunk
   containers are pulled in parallel by the engine as the camera needs them
-  (concurrency pool of 6, 1 retry on failure), with total progress aggregated across
-  streams as loaded instances / total instances;
+  (concurrency pool of 6, 1 retry on failure);
+- **LOD-tiered streaming**: each chunk's detail tier follows the view distance
+  (defaults: near <300 m full detail, mid 300–600 m decimated, far ≥600 m coarsest;
+  hysteresis at band edges prevents thrashing). Far chunks load coarse-first,
+  approaching upgrades to fine detail and releases the coarse tier's GPU memory,
+  retreating downgrades and reclaims it; tier swaps reuse already-cached tier
+  containers (no re-download). Streaming progress is measured against the currently
+  required set: the denominator is the required chunks' instance shares, the
+  numerator the shares mounted at (or above) their required tier;
 - **Switch cache**: a package's index download + verification result is cached per
-  MapId; switching back never re-downloads. Chunk containers stay cached until the
-  map is unloaded;
+  MapId; switching back never re-downloads. Tier containers stay cached per file
+  until the map is unloaded;
 - **Three failure states**: missing container or network failure → `unavailable`
   (the switcher shows "data pack in preparation" with a retry action); integrity or
   manifest failure → `corrupt`; anything else → `unknown`. The status bar shows the

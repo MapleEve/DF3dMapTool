@@ -2,7 +2,9 @@ import { DmapLoader } from "./loader.js";
 import {
   CHUNK_ENTRY_NAME,
   MAP_MANIFEST_ENTRY,
+  chunkLodFile,
   parseMapManifest,
+  type DmapChunkLodSource,
   type DmapChunkRef,
   type DmapMapManifest,
 } from "./manifest.js";
@@ -18,13 +20,15 @@ import { resolveAesKey, type DmapKeySource } from "./key.js";
  * });
  * const poi = pkg.readJson(pkg.manifest.entries.poi);     // 索引容器：立即可读
  * const glb = await pkg.readChunk(pkg.manifest.chunks[0]); // 分块容器：按名惰性拉取
+ * const lod2 = await pkg.readChunkLod(pkg.manifest.chunks[0], 2); // v4：按细节层拉取
  * ```
  *
- * - **第一段**：`openIndex` 打开索引容器，解析并校验 dmap-map-manifest/3 清单
- *   ——POI/配置/图标/2D 标定随索引即可读取，UI 无需等待任何分块；
- * - **第二段**：`readChunk` 按清单中的容器文件名惰性拉取分块容器
- *   （宿主经 `fetchContainer` 注入字节来源），成功打开的容器常驻缓存，
- *   打开失败不缓存——重试会重新拉取字节。
+ * - **第一段**：`openIndex` 打开索引容器，解析并校验 dmap-map-manifest/3 或 /4
+ *   清单——POI/配置/图标/2D 标定随索引即可读取，UI 无需等待任何分块；
+ * - **第二段**：`readChunk` / `readChunkLod` 按清单中的容器文件名惰性拉取分块容器
+ *   （宿主经 `fetchContainer` 注入字节来源），成功打开的容器按文件常驻缓存，
+ *   打开失败不缓存——重试会重新拉取字节。v4 分层包中各层容器为独立文件，
+ *   缓存互不挤占：升/降级换层时已打开的层可直接复用。
  */
 export interface DmapMapPackageOptions {
   /** 分块容器字节来源：入参为清单 chunks[].file（相对地图资产目录）。 */
@@ -115,11 +119,21 @@ export class DmapMapPackage {
   // ---- 分块容器（第二段：按名惰性打开 + 缓存）----
 
   /**
-   * 读取一个分块的 GLB 载荷字节。
+   * 读取一个分块最高细节层（level 0）的 GLB 载荷字节。
    * 分块容器按清单文件名惰性拉取并缓存；未注入 fetchContainer 时抛 DmapFormatError。
    */
   async readChunk(chunk: Pick<DmapChunkRef, "file">): Promise<Uint8Array> {
     const loader = await this.chunkLoader(chunk.file);
+    return loader.read(CHUNK_ENTRY_NAME);
+  }
+
+  /**
+   * 读取一个分块指定细节层的 GLB 载荷字节（v4 分层包）。
+   * 层容器路径由清单 lods 表解析（无表的单层包任意 level 均回落 `chunk.file`）；
+   * 已打开的层容器常驻缓存，层间互不挤占。
+   */
+  async readChunkLod(chunk: DmapChunkLodSource, level: number): Promise<Uint8Array> {
+    const loader = await this.chunkLoader(chunkLodFile(chunk, level));
     return loader.read(CHUNK_ENTRY_NAME);
   }
 
