@@ -41,7 +41,7 @@ function formatMarkerCount(count: number): string {
   return String(Math.min(99, Math.max(0, count))).padStart(2, "0");
 }
 
-/** 路线显示名：跟随语言（en 用数据内英文名；ja/ko 无源数据回退 zh 明文）。 */
+/** 路线显示名：跟随语言（en 用数据内英文名；ru/tw 无数据包译文回退 zh 明文）。 */
 function routeDisplayName(route: RuntimeRoute, language: string): string {
   if (language === "en" && route.nameEn !== null) {
     return route.nameEn;

@@ -1,0 +1,6 @@
+<svg width="641" height="282" viewBox="0 0 641 282" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Scene-loading slogan (English). 641x282 matches the loading-screen slot; copy is our own. -->
+  <text x="320.5" y="118" text-anchor="middle" fill="#62F5BD" font-family="'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="48" font-weight="700">Master every map in 3D</text>
+  <text x="320.5" y="196" text-anchor="middle" fill="#62F5BD" font-family="'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="30" font-weight="500">Route playback · POI search · Floor switching</text>
+  <text x="320.5" y="252" text-anchor="middle" fill="#62F5BD" fill-opacity="0.85" font-family="'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="22" font-weight="400">All six maps bundled · ready out of the box</text>
+</svg>

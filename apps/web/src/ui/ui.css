@@ -814,6 +814,60 @@
   overflow: hidden;
 }
 
+/* 玩法模式面板：画布右上常驻（上游大地图 GameMode 面板的承载位），选中态主绿。 */
+.bigmap-mode-panel {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 2;
+  width: 232px;
+  padding: 12px 14px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* 面板标题 16px 黄（楼层切换标题同口径）。 */
+.bigmap-mode-title {
+  margin: 0;
+  font-size: 16px;
+  color: var(--yellow);
+}
+
+.bigmap-mode-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.bigmap-mode {
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 16px;
+  color: var(--text);
+}
+
+.bigmap-mode:hover {
+  border-color: var(--accent);
+}
+
+.bigmap-mode.active {
+  border-color: var(--accent);
+  background: rgba(15, 247, 150, 0.12);
+  color: var(--accent);
+}
+
+.bigmap-mode-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
 .bigmap-canvas {
   position: absolute;
   inset: 0;
@@ -990,11 +1044,13 @@
   background: rgba(4, 6, 10, 0.55);
 }
 
-/* 面板：settingList 1110x784 口径（视口内自适应）。 */
+/* 面板：头 68（页签行 48 + 上边距 20）+ 列表 784 + 底栏 88 = 940 内容高；
+ * 列表区 1110 宽 + 左右 32 边距 = 1110+64 内容宽。含 1px 边框（border-box）
+ * → 面板 1176x954（settingList 1110x784 口径，视口内自适应）。 */
 .settings-root {
   position: relative;
-  width: min(1110px, 94vw);
-  height: min(784px, 88vh);
+  width: min(1176px, 96vw);
+  height: min(954px, 94vh);
   display: flex;
   flex-direction: column;
   background: #0c1317;
@@ -1067,10 +1123,11 @@
   color: var(--accent);
 }
 
-/* 参数列表：行距 54px（参数行 1050x54），列表底 #202A33@0.902。 */
+/* 参数列表：settingList 1110x784（行距 54px、参数行 1050x54），列表底 #202A33@0.902。 */
 .settings-list {
   flex: 1;
-  margin: 20px 32px 0;
+  min-height: 0;
+  margin: 12px 32px 0;
   background: rgba(32, 42, 51, 0.902);
   border-radius: 6px;
   overflow-y: auto;
@@ -1081,12 +1138,12 @@
   padding: 0 30px;
 }
 
+/* 参数行固定 54px（1050 宽内容 = 标签 260 + 控制区 476 + 说明 280 + 列距 16×3）。 */
 .settings-row {
   display: flex;
   align-items: center;
   gap: 16px;
-  min-height: 54px;
-  padding: 6px 0;
+  height: 54px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.102);
 }
 
@@ -1094,7 +1151,7 @@
   border-bottom: none;
 }
 
-/* 标签 16px 白 + 说明列 16px@0.502（原 desc 列口径）。 */
+/* 标签 16px 白 + 说明列 16px@0.502 单行（原 desc 列口径）。 */
 .settings-row-label {
   width: 260px;
   flex: none;
@@ -1111,10 +1168,13 @@
 }
 
 .settings-row-desc {
-  width: 320px;
+  width: 280px;
   flex: none;
-  font-size: 13px;
-  line-height: 1.5;
+  font-size: 16px;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   color: var(--text-faint);
 }
 
@@ -1126,9 +1186,9 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* 滑杆 374x22（Fill 白@0.698 / Handle #BDC2C5 / 底 白@0.2）。 */
+/* 滑杆 374x22（值列在滑杆左侧；Fill 白@0.698 / Handle #BDC2C5 / 底 白@0.2）。 */
 .settings-row input[type="range"] {
-  width: min(374px, 40%);
+  width: 374px;
   height: 22px;
   margin: 0;
   accent-color: var(--accent);
@@ -1184,12 +1244,12 @@
   color: var(--accent);
 }
 
-/* 底栏：返回（16px 白@0.698）+ 切换地图（240x64 黑字）+ 退出工具（绿字）。 */
+/* 底栏 88：返回（16px 白@0.698 文字钮）+ 切换地图（240x64 黑字）+ 退出工具（绿字 240x64）。 */
 .settings-footer {
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 16px 32px 20px;
+  padding: 12px 32px;
 }
 
 .settings-back {
@@ -1515,12 +1575,12 @@
   color: var(--text-dim);
 }
 
-/* 立即行动 CTA：300x84 绿底黑字 32px（原 btnConfirm 口径）。 */
+/* 立即行动 CTA：300x84 绿底黑字 32px（原 btnConfirm 口径；绿=主色 #0FF796）。 */
 .home-cta {
   flex: none;
   width: 300px;
   height: 84px;
-  background: #0ef293;
+  background: var(--accent);
   border: none;
   border-radius: 8px;
   font-size: 32px;
@@ -2930,4 +2990,53 @@
 
 .collection-unable-trade {
   margin-left: 0;
+}
+
+/* ---------- WebGL 引导提示（#65） ---------- */
+
+/* 顶部居中的警示条位面板（不遮操作：用户可切 2D 沙盘继续使用，或点「知道了」关闭）。 */
+.webgl-guide {
+  position: fixed;
+  left: 50%;
+  top: 96px;
+  transform: translateX(-50%);
+  z-index: 55;
+  width: 420px;
+  max-width: calc(100vw - 32px);
+  padding: 14px 18px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: center;
+}
+
+.webgl-guide-title {
+  margin: 0;
+  font-size: 16px;
+  color: var(--yellow);
+}
+
+.webgl-guide-body {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text);
+}
+
+.webgl-guide-dismiss {
+  align-self: center;
+  padding: 6px 22px;
+  font-size: 14px;
+  color: #06130c;
+  background: var(--accent);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.webgl-guide-dismiss:hover {
+  filter: brightness(1.1);
 }

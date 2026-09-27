@@ -10,11 +10,14 @@ import {
   type MapBundle,
 } from "@/data";
 import type { MapViewer, ScreenAnchor } from "@/engine";
+import { routeRenderModeForPoints } from "@/engine/routeLayer";
+import { availableMapModes } from "@/poi/filter";
 import { getMapById } from "@/map";
 import { MinimapHudContainer } from "@/bigmap";
 import { FRAME_LIMIT_FPS, QUALITY_PIXEL_RATIO, useUiStore } from "@/state/uiStore";
 import { useFloorStore } from "@/state/floorStore";
 import { useMapDataStore } from "@/state/mapDataStore";
+import { useMapModeStore } from "@/state/mapModeStore";
 import { useMapStore } from "@/state/mapStore";
 import { useNavStore } from "@/state/navStore";
 import { usePoiStore } from "@/state/poiStore";
@@ -24,6 +27,8 @@ import { useInteractStore } from "@/state/interactStore";
 import { useCollectionStore } from "@/state/collectionStore";
 import { NavPathHud } from "./NavPathHud";
 import { PoiOverlay, type PoiProjector } from "./PoiOverlay";
+import { isBareHotkey } from "./hotkeys";
+import { pickRespawnPosition, RESPAWN_REVEAL_MS, RESPAWN_TELEPORT_DELAY_MS } from "./respawn";
 
 /** HUD 世界坐标/朝向的上报间隔（毫秒）。 */
 const CAMERA_HUD_INTERVAL_MS = 200;
@@ -54,6 +59,7 @@ export function MapViewport({ hidden = false }: { hidden?: boolean }) {
   const sensitivity = useUiStore((state) => state.sensitivity);
   const renderDistance = useUiStore((state) => state.renderDistance);
   const frameLimit = useUiStore((state) => state.frameLimit);
+  const ambientMotes = useUiStore((state) => state.ambientMotes);
 
   // 引擎装载（一次）：产出就绪 promise 供数据加载衔接（StrictMode 双挂载安全）。
   // 抗锯齿是渲染器创建参数，只在装载时读取一次；变更需重建视口（重启页面）。
@@ -122,7 +128,10 @@ export function MapViewport({ hidden = false }: { hidden?: boolean }) {
       const floors =
         bundle.manifest.floors.length > 0 ? bundle.manifest.floors : bundle.definition.knownFloors;
       useFloorStore.getState().applyFloors(floors, bundle.definition.defaultFloor);
-      useMapDataStore.getState().setMapData(mapId, bundle, readMapPoiData(bundle));
+      const poiData = readMapPoiData(bundle);
+      useMapDataStore.getState().setMapData(mapId, bundle, poiData);
+      // 玩法模式可用集随图同步（POI 派生）；当前模式失效时由 store 回落首档。
+      useMapModeStore.getState().applyAvailableModes(availableMapModes(poiData.pois));
 
       // 引擎复用已打开的分片包，分块容器按需并行拉取（并发池 + 跨流聚合进度）。
       // 流式统计写入 mapStore（仅徽标订阅）：不把引擎回调耦合成本地 state，
@@ -174,6 +183,7 @@ export function MapViewport({ hidden = false }: { hidden?: boolean }) {
         instance?.unloadMap();
       });
       useMapDataStore.getState().clear();
+      useMapModeStore.getState().reset();
       const definition = getMapById(mapId);
       if (definition !== undefined) {
         useFloorStore.getState().applyFloors(definition.knownFloors, definition.defaultFloor);
@@ -204,6 +214,15 @@ export function MapViewport({ hidden = false }: { hidden?: boolean }) {
     viewer.sceneManager.setFrameLimit(FRAME_LIMIT_FPS[frameLimit]);
   }, [viewer, frameLimit]);
 
+  // 环境漂浮粒子（「环境漂浮粒子」设置项的真实效果）：开关即时增删粒子层；
+  // 层跨地图常驻（不随换图重建），粒子环绕相机注视点漂浮。
+  useEffect(() => {
+    if (viewer === null) {
+      return;
+    }
+    viewer.setAmbientMotes(ambientMotes);
+  }, [viewer, ambientMotes]);
+
   // 2D 沙盘视图激活时暂停渲染循环（场景保持挂载），切回即恢复；
   // 飞行动画按帧间隔推进，暂停期间冻结、恢复后从原进度续播。
   useEffect(() => {
@@ -226,18 +245,57 @@ export function MapViewport({ hidden = false }: { hidden?: boolean }) {
     viewer.applyCameraSettings({ fov, sensitivity, renderDistance });
   }, [viewer, fov, sensitivity, renderDistance]);
 
-  // 回出生点：注册到 store，设置面板触发。
+  // 回出生点：注册到 store（R 键与设置面板按钮同一执行器）。
+  // 流程：进图加载遮罩上屏 → 短延迟后遮罩下硬传送相机到出生点集随机落点
+  // （无出生点数据时回落地图默认出生点/进场取景位）→ 遮罩期间流式拉取
+  // 新取景区域分块 → 定时硬切卸载遮罩（弱环境主线程饱和时定时器顺延，
+  // 实际解除落在流式收口之后）。传送前短延迟：先让遮罩渲染上屏再触发
+  // 新区域的流式重活，避免遮罩挂起被饿死（按键后见到的是加载屏而非冻结旧帧）。
   useEffect(() => {
     if (viewer === null) {
       return;
     }
     useUiStore.getState().registerRespawn(() => {
-      viewer.respawn();
+      const ui = useUiStore.getState();
+      if (ui.respawnCoverOpen) {
+        return;
+      }
+      const poiData = useMapDataStore.getState().poiData;
+      const position =
+        poiData === null
+          ? null
+          : pickRespawnPosition(poiData.pois, poiData.categories, poiData.defaultBornPos);
+      ui.setRespawnCoverOpen(true);
+      window.setTimeout(() => {
+        viewer.respawn(position);
+      }, RESPAWN_TELEPORT_DELAY_MS);
+      window.setTimeout(() => {
+        useUiStore.getState().setRespawnCoverOpen(false);
+      }, RESPAWN_REVEAL_MS);
     });
     return () => {
       useUiStore.getState().registerRespawn(null);
     };
   }, [viewer]);
+
+  // R 键回出生点：3D 视图即时触发（HUD 常驻键位；与设置面板按钮同一执行器，
+  // 视口未就绪时 requestRespawn 静默忽略）。
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!isBareHotkey(event, "r")) {
+        return;
+      }
+      if (hidden || useViewStore.getState().view !== "3d") {
+        return;
+      }
+      event.preventDefault();
+      useUiStore.getState().requestRespawn();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [hidden]);
 
   // 寻路：订阅 navStore 请求，懒加载导航数据后 A* 求解；
   // 起点取相机注视点（模拟器语义：漫游者即相机），终点为请求目标点。
@@ -352,15 +410,16 @@ export function MapViewport({ hidden = false }: { hidden?: boolean }) {
   }, [viewer]);
 
   // 路线系统：详情选中路线 → 3D 主线呈现；跟跑请求 → 相机沿点位按原始节奏回放。
+  // 跟跑启动时按路线数据选择全程/分段渲染（分段模式只画前方窗口，随进度推进），
+  // 跟跑结束（自然完成/打断/结束导航）后恢复详情主线的全程呈现。
   useEffect(() => {
     if (viewer === null) {
       return;
     }
-    const renderDetail = (route: ReturnType<typeof useRouteStore.getState>["detailRoute"]) => {
-      if (route === null) {
-        viewer.setRouteDisplay(null);
-        return;
-      }
+    const routePoints = (route: {
+      readonly pointCount: number;
+      readonly points: Float32Array;
+    }): Vec3[] => {
       const points: Vec3[] = [];
       for (let i = 0; i < route.pointCount; i += 1) {
         const base = i * 3;
@@ -370,8 +429,15 @@ export function MapViewport({ hidden = false }: { hidden?: boolean }) {
           z: route.points[base + 2] ?? 0,
         });
       }
+      return points;
+    };
+    const renderDetail = (route: ReturnType<typeof useRouteStore.getState>["detailRoute"]) => {
+      if (route === null) {
+        viewer.setRouteDisplay(null);
+        return;
+      }
       viewer.setRouteDisplay(
-        points,
+        routePoints(route),
         route.markers.map((marker) => marker.worldPos),
       );
     };
@@ -388,6 +454,8 @@ export function MapViewport({ hidden = false }: { hidden?: boolean }) {
       }
       if (state.followRouteId === null) {
         viewer.stopRoutePlayback();
+        viewer.setRouteSegmentIndex(null);
+        renderDetail(useRouteStore.getState().detailRoute);
         return;
       }
       const route =
@@ -398,16 +466,25 @@ export function MapViewport({ hidden = false }: { hidden?: boolean }) {
         return;
       }
       const routeId = route.id;
+      // 导航启动：路线主线 + 标注路牌随跟跑呈现，渲染模式按点位规模决定。
+      viewer.setRouteDisplay(
+        routePoints(route),
+        route.markers.map((marker) => marker.worldPos),
+        routeRenderModeForPoints(route.pointCount),
+      );
       const playback = viewer.startRoutePlayback(
         route.points,
         route.durationSeconds,
         (fraction, pointIndex) => {
           useRouteStore.getState().reportFollowProgress(routeId, fraction, pointIndex);
+          viewer.setRouteSegmentIndex(pointIndex);
         },
       );
       if (playback !== null) {
         void playback.then((completed) => {
           useRouteStore.getState().finishFollow(routeId);
+          viewer.setRouteSegmentIndex(null);
+          renderDetail(useRouteStore.getState().detailRoute);
           void completed;
         });
       }

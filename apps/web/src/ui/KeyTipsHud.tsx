@@ -10,8 +10,9 @@ import { useViewStore } from "@/state/viewStore";
  * 结构口径对齐上游 HUD 实测：面板 content 240x245.5、行 240x30
  * （键名 14px 白 + 说明 14px 白）、标题「操作说明」16px、
  * Tab 折叠钮 显示/隐藏操作说明 12px 白@0.698、边 #585758、行底 #0A0F11。
- * 键位行只列本应用真实存在的控制（轨道相机拖拽/右键/滚轮 + M/Esc/Tab）；
- * Q/F/R 等键位行随对应功能落地时在 ROWS 追加。
+ * 键位行只列本应用真实存在的控制：轨道相机三行（拖拽/右键/滚轮，替代上游 WASD/Shift/Space
+ * 第一人称行——既定轨道相机口径）+ Esc/Q/M/R/F 五行（上游键序 Esc→Q→M，R/F 为上游
+ * 常驻键位提示对应行）+ Tab 折叠行。
  */
 export function KeyTipsHud() {
   const { t } = useTranslation();
@@ -58,8 +59,11 @@ export function KeyTipsHud() {
     { key: t("keytips.keyDrag"), label: t("keytips.rotate") },
     { key: t("keytips.keyRightDrag"), label: t("keytips.pan") },
     { key: t("keytips.keyWheel"), label: t("keytips.zoom") },
-    { key: t("keytips.keyM"), label: t("keytips.bigmap") },
     { key: t("keytips.keyEsc"), label: t("keytips.settings") },
+    { key: t("keytips.keyQ"), label: t("keytips.routeNav") },
+    { key: t("keytips.keyM"), label: t("keytips.bigmap") },
+    { key: t("keytips.keyR"), label: t("keytips.respawn") },
+    { key: t("keytips.keyF"), label: t("keytips.interact") },
     { key: t("keytips.keyTab"), label: expanded ? t("keytips.hide") : t("keytips.show") },
   ];
 

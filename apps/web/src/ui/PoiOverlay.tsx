@@ -6,6 +6,7 @@ import { filterPois } from "@/poi/filter";
 import type { PoiDefinition } from "@/poi/types";
 import { useFloorStore } from "@/state/floorStore";
 import { useMapDataStore } from "@/state/mapDataStore";
+import { useMapModeStore } from "@/state/mapModeStore";
 import { usePoiFilterStore } from "@/state/poiFilterStore";
 import { usePoiStore } from "@/state/poiStore";
 import { PoiBubble } from "./PoiBubble";
@@ -32,6 +33,7 @@ export function PoiOverlay({ projector }: PoiOverlayProps) {
   const poiData = useMapDataStore((state) => state.poiData);
   const hiddenCategories = usePoiFilterStore((state) => state.hiddenCategories);
   const floor = useFloorStore((state) => state.floor);
+  const mode = useMapModeStore((state) => state.mode);
   const selectedPoiId = usePoiStore((state) => state.selectedPoiId);
   const selectPoi = usePoiStore((state) => state.selectPoi);
   const requestFlyTo = usePoiStore((state) => state.requestFlyTo);
@@ -40,13 +42,13 @@ export function PoiOverlay({ projector }: PoiOverlayProps) {
   const bubbleRef = useRef<HTMLDivElement>(null);
   const screenPositions = useRef(new Map<string, { x: number; y: number } | null>());
 
-  // 当前楼层/筛选下的可见 POI（楼层 0 = 全楼层，恒可见）。
+  // 当前楼层/模式/筛选下的可见 POI（楼层 0 = 全楼层，恒可见）。
   const visiblePois = useMemo(() => {
     if (poiData === null) {
       return [];
     }
-    return filterPois(poiData.pois, { hiddenCategories, floor });
-  }, [poiData, hiddenCategories, floor]);
+    return filterPois(poiData.pois, { hiddenCategories, floor, mode });
+  }, [poiData, hiddenCategories, floor, mode]);
 
   const selectedPoi = useMemo(() => {
     if (poiData === null || selectedPoiId === null) {

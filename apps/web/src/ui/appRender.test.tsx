@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { renderToString } from "react-dom/server";
 import App from "@/App";
 import { initI18n } from "@/i18n";
+import { BigmapModePanel } from "./BigmapOverlay";
 
 /**
  * 应用外壳渲染冒烟：SSR 渲染整棵 UI 树（视口的动态引擎导入不在此触发），
@@ -36,5 +37,18 @@ describe("App 外壳渲染", () => {
     expect(html).toContain('class="map-viewport"');
     expect(html).not.toContain("map-viewport hidden");
     expect(html).toContain("大地图 (M)");
+  });
+
+  it("大地图模式面板（受控形态）：玩法模式档位 + 选中态 + 提示行", async () => {
+    await initI18n();
+    const html = renderToString(<BigmapModePanel modes={[2]} current={2} onSelect={() => {}} />);
+    expect(html).toContain("玩法模式");
+    expect(html).toContain("机密");
+    expect(html).toContain('aria-selected="true"');
+    expect(html).toContain("切换后仅显示该模式的点位");
+    // 空集（数据未就绪）不渲染。
+    expect(renderToString(<BigmapModePanel modes={[]} current={null} onSelect={() => {}} />)).toBe(
+      "",
+    );
   });
 });

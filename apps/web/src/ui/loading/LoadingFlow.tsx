@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import { useMapStore } from "@/state/mapStore";
+import { useUiStore } from "@/state/uiStore";
 import { useViewStore } from "@/state/viewStore";
 import { useHomeStore } from "../homeStore";
 import { BootLoadingScreen } from "./BootLoadingScreen";
 import { MapLoadingScreen } from "./MapLoadingScreen";
+import { RespawnCover } from "./RespawnCover";
 import {
   advanceSceneProgress,
   initialSceneProgressState,
@@ -87,20 +89,35 @@ function useSceneProgress(): SceneProgressState {
  * 4. 首屏分块批次排空（或停滞退避）→ 进图屏硬切卸载，3D 视图直接呈现。
  * 换图（loadSeq 递增）时只回到第 3 步（boot 屏是启动一次性画面）；
  * 失败（error）时两屏都卸载，露出状态栏错误提示。
+ * 回出生点（R 键/设置面板按钮）另走回出生点遮罩：同款进图屏视觉，
+ * 百分比爬升至 99 后硬切卸载（相机在遮罩下已传送就位，见 ui/respawn.ts）。
  */
 export function LoadingFlow() {
   const bootDone = useBootDone();
   const view = useViewStore((state) => state.view);
   const homeOpen = useHomeStore((state) => state.homeOpen);
   const status = useMapStore((state) => state.status);
+  const indexFraction = useMapStore((state) => state.progress);
+  const respawnCoverOpen = useUiStore((state) => state.respawnCoverOpen);
   const scene = useSceneProgress();
 
   const showScene = bootDone && !homeOpen && view === "3d" && status !== "error" && !scene.revealed;
+  // 下载态 = 索引容器尚未就绪（idle/loading）：进图屏进度区呈现 logo+slogan 与「正在下载 N%」；
+  // ready 后切流式态（大百分比），两态硬切。
+  const downloading = status === "idle" || status === "loading";
+  const downloadPercent = Math.round(Math.min(1, Math.max(0, indexFraction)) * 100);
 
   return (
     <>
       {!bootDone ? <BootLoadingScreen /> : null}
-      {showScene ? <MapLoadingScreen percent={scene.percent} /> : null}
+      {showScene ? (
+        <MapLoadingScreen
+          percent={scene.percent}
+          downloading={downloading}
+          downloadPercent={downloadPercent}
+        />
+      ) : null}
+      {respawnCoverOpen && view === "3d" ? <RespawnCover /> : null}
     </>
   );
 }

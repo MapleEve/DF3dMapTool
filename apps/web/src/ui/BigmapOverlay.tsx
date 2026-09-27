@@ -10,13 +10,63 @@ import {
 import { MAX_ZOOM_INDEX, MIN_ZOOM_INDEX, planTeleport, resolveTeleportFloor } from "@/bigmap";
 import { BigmapCanvas, type BigmapController, type BigmapPoiMarker } from "@/bigmap/BigmapCanvas";
 import type { WorldXZ } from "@/bigmap/types";
+import { getMapModeById } from "@/map/mapModes";
 import { filterPois } from "@/poi/filter";
 import { useFloorStore } from "@/state/floorStore";
 import { useMapDataStore } from "@/state/mapDataStore";
+import { useMapModeStore } from "@/state/mapModeStore";
 import { useMapStore } from "@/state/mapStore";
 import { usePoiFilterStore } from "@/state/poiFilterStore";
 import { usePoiStore } from "@/state/poiStore";
 import { useUiStore } from "@/state/uiStore";
+
+/**
+ * 玩法模式面板（受控形态，大地图右侧）：当前图可用模式 + 选中态。
+ * 模式集由数据包 POI 派生（每图固定档位），选中后 POI/搜索/小地图按模式过滤；
+ * 组件受控（modes/current/onSelect props），SSR 冒烟与实装共用。
+ */
+export function BigmapModePanel({
+  modes,
+  current,
+  onSelect,
+}: {
+  modes: readonly number[];
+  current: number | null;
+  onSelect: (mode: number) => void;
+}) {
+  const { t } = useTranslation();
+  if (modes.length === 0) {
+    return null;
+  }
+  return (
+    <aside className="bigmap-mode-panel" aria-label={t("bigmap.modeTitle")}>
+      <h3 className="bigmap-mode-title">{t("bigmap.modeTitle")}</h3>
+      <div className="bigmap-mode-list" role="tablist" aria-label={t("bigmap.modeTitle")}>
+        {modes.map((mode) => {
+          const definition = getMapModeById(mode);
+          const label =
+            definition !== undefined
+              ? t(definition.labelKey as never, { defaultValue: definition.label })
+              : String(mode);
+          const active = mode === current;
+          return (
+            <button
+              key={mode}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              className={active ? "bigmap-mode active" : "bigmap-mode"}
+              onClick={() => onSelect(mode)}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
+      <p className="bigmap-mode-hint">{t("bigmap.modeHint")}</p>
+    </aside>
+  );
+}
 
 /**
  * 2D 俯视大地图覆盖层（M 键全屏）。
@@ -42,6 +92,9 @@ function BigmapOverlayInner() {
   const floor = useFloorStore((state) => state.floor);
   const setFloor = useFloorStore((state) => state.setFloor);
   const hiddenCategories = usePoiFilterStore((state) => state.hiddenCategories);
+  const mode = useMapModeStore((state) => state.mode);
+  const availableModes = useMapModeStore((state) => state.availableModes);
+  const setMode = useMapModeStore((state) => state.setMode);
   const selectedPoiId = usePoiStore((state) => state.selectedPoiId);
   const selectPoi = usePoiStore((state) => state.selectPoi);
   const requestFlyTo = usePoiStore((state) => state.requestFlyTo);
@@ -89,7 +142,7 @@ function BigmapOverlayInner() {
     return floorEntry !== null ? floorCalibration(floorEntry) : null;
   }, [floorEntry]);
 
-  // 2D POI：同源数据 + 分类/楼层筛选（全图概览不过滤楼层）+ hideInBigmap；
+  // 2D POI：同源数据 + 分类/楼层/模式筛选（全图概览不过滤楼层）+ hideInBigmap；
   // 图标位图来自 iconImages state（解码完成后重算标记触发重绘）。
   const markers: readonly BigmapPoiMarker[] = useMemo(() => {
     if (poiData === null) {
@@ -98,6 +151,7 @@ function BigmapOverlayInner() {
     const visible = filterPois(poiData.pois, {
       hiddenCategories,
       floor: bigmapFloor,
+      mode,
     }).filter((poi) => poi.hiddenInBigmap !== true);
     return visible.map((poi) => ({
       id: poi.id,
@@ -107,7 +161,7 @@ function BigmapOverlayInner() {
       icon: poi.iconFile !== undefined ? (iconImages.get(poi.iconFile) ?? null) : null,
       selected: poi.id === selectedPoiId,
     }));
-  }, [poiData, hiddenCategories, bigmapFloor, selectedPoiId, iconImages]);
+  }, [poiData, hiddenCategories, bigmapFloor, mode, selectedPoiId, iconImages]);
 
   // 预加载 POI 图标位图（去重经 requestedRef——effect 内读写 ref 合法；
   // 解码完成写 state，触发标记重算）。
@@ -347,6 +401,7 @@ function BigmapOverlayInner() {
             {status === "ready" ? t("bigmap.needCalibration") : t("sidebar.needMapData")}
           </p>
         )}
+        <BigmapModePanel modes={availableModes} current={mode} onSelect={setMode} />
       </div>
       {selectedRegion !== null ? (
         <footer className="bigmap-region-bar" role="status">

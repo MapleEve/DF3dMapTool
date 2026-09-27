@@ -30,7 +30,18 @@ describe("设置持久化（localStorage）", () => {
       cameraHud: null,
       screenshotHandler: null,
       respawnHandler: null,
+      respawnCoverOpen: false,
     });
+  });
+
+  it("默认值口径：灵敏度 0.45 / FOV 75（上游设置面板实测默认）", () => {
+    expect(SENSITIVITY_DEFAULT).toBe(0.45);
+    expect(FOV_DEFAULT).toBe(75);
+    // 默认值落在滑杆范围内（可直接下发引擎）。
+    useUiStore.getState().setSensitivity(SENSITIVITY_DEFAULT);
+    useUiStore.getState().setFov(FOV_DEFAULT);
+    expect(useUiStore.getState().sensitivity).toBe(0.45);
+    expect(useUiStore.getState().fov).toBe(75);
   });
 
   it("FOV 写入存储并钳制在合法范围", () => {
@@ -85,5 +96,13 @@ describe("设置持久化（localStorage）", () => {
     useUiStore.getState().registerRespawn(null);
     expect(() => useUiStore.getState().requestRespawn()).not.toThrow();
     expect(calls).toBe(1);
+  });
+
+  it("回出生点加载遮罩状态：开/关直写（流程侧遮罩上屏与定时硬切卸载）", () => {
+    expect(useUiStore.getState().respawnCoverOpen).toBe(false);
+    useUiStore.getState().setRespawnCoverOpen(true);
+    expect(useUiStore.getState().respawnCoverOpen).toBe(true);
+    useUiStore.getState().setRespawnCoverOpen(false);
+    expect(useUiStore.getState().respawnCoverOpen).toBe(false);
   });
 });

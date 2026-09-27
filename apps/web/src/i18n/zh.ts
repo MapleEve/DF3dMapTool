@@ -1,4 +1,4 @@
-/** 中文文案（默认语言）。en.ts / ja.ts / ko.ts 的结构与本文件严格同构。 */
+/** 中文文案（默认语言）。en.ts / ru.ts / tw.ts 的结构与本文件严格同构。 */
 export const zh = {
   app: {
     title: "DF3dMapTool",
@@ -19,6 +19,11 @@ export const zh = {
     label: "楼层",
     floorName: "{{floor}} 层",
     basement: "地下 {{floor}} 层",
+  },
+  mapMode: {
+    normal: "常规",
+    confidential: "机密",
+    topSecret: "绝密",
   },
   poiCategory: {
     extract: "撤离点",
@@ -143,6 +148,8 @@ export const zh = {
     needCalibration: "当前地图暂无俯视标定数据",
     overviewFloor: "全图",
     floorTitle: "楼层切换",
+    modeTitle: "玩法模式",
+    modeHint: "切换后仅显示该模式的点位",
     zoomIn: "放大",
     zoomOut: "缩小",
     zoomSlider: "缩放比例",
@@ -165,16 +172,28 @@ export const zh = {
     keyDrag: "拖拽",
     keyRightDrag: "右键拖拽",
     keyWheel: "滚轮",
+    keyQ: "Q",
+    keyR: "R",
+    keyF: "F",
     keyM: "M",
     keyEsc: "Esc",
     keyTab: "Tab",
     rotate: "旋转视角",
     pan: "平移视角",
     zoom: "缩放",
+    routeNav: "线路导航",
+    respawn: "重回出生点",
+    interact: "交互",
     bigmap: "切换大地图",
     settings: "呼出设置菜单",
     show: "显示操作说明",
     hide: "隐藏操作说明",
+  },
+  // WebGL 引导提示（浏览器不支持 WebGL 时的降级引导）。
+  webglGuide: {
+    title: "3D 视图不可用",
+    body: "当前浏览器不支持 WebGL，无法渲染 3D 场景。请换用支持 WebGL 的现代浏览器；2D 沙盘视图不受影响。",
+    dismiss: "知道了",
   },
   home: {
     mapSelect: "选择地图",
@@ -219,12 +238,11 @@ export const zh = {
     respawn: "回出生点",
     respawnAction: "回到进场取景位",
     airJump: "空中无限跳",
-    airJumpHint:
-      "可通过连续按空格键实现在空中无限跳效果，此功能还在实验阶段，可能探索未完善的地图时容易掉落虚空。",
+    airJumpHint: "轨道相机模式下无角色跳跃，此项仅保存偏好。",
     volume: "音量",
-    volumeHint: "当前模拟器暂无音频输出，此项仅保存偏好。",
+    volumeHint: "控制场景环境音量（WebAudio 实时合成，无外部音频素材）。",
     ambientMotes: "环境漂浮粒子",
-    ambientMotesHint: "当前场景未构建粒子系统，此项仅保存偏好。",
+    ambientMotesHint: "场景内的环境漂浮微粒，关闭后立即移除。",
     on: "开",
     off: "关",
     qualityLevels: {

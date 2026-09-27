@@ -22,9 +22,10 @@ const FRAME_LIMIT_LEVELS: readonly FrameLimitLevel[] = ["unlimited", "60", "30"]
  *
  * 结构口径上游实测锚定：
  * - 「设置」水印 80px 白@0.102；「参数设置」页签 36px（页签组 262x48）；
- * - 参数行 1050x54：标签 16px 白、值 16px 白@0.502、
- *   滑杆 374x22、toggle 开/关、行分隔线 1px 白@0.102；列表底 #202A33@0.902；
- * - 底栏：返回 16px 白@0.698 + 切换地图 240x64 黑字 + 退出工具 240x64 绿字；
+ * - settingList 1110x784、列表底 #202A33@0.902；
+ * - 参数行 1050x54（固定行高，行距 54px）：标签 16px 白、值 16px 白@0.502、
+ *   值列在滑杆左侧、滑杆 374x22、toggle 开/关、行分隔线 1px 白@0.102；
+ * - 底栏：返回 16px 白@0.698 文字钮 + 切换地图 240x64 黑字 + 退出工具 240x64 绿字；
  * - 重置=确认弹窗 440x264：标题 28px/内容 24px #B5B7B8/确定绿字/取消黑字。
  * 页签只保留「参数设置」（客户端下载/反馈二维码区无真实对应物，不放）。
  */
@@ -255,6 +256,7 @@ function ParameterRows() {
         desc={t("settings.sensitivityDesc")}
         control={
           <>
+            <span className="settings-slider-value">{sensitivity.toFixed(2)}</span>
             <input
               id="settings-sensitivity"
               type="range"
@@ -264,7 +266,6 @@ function ParameterRows() {
               value={sensitivity}
               onChange={(event) => setSensitivity(Number(event.target.value))}
             />
-            <span className="settings-slider-value">{sensitivity.toFixed(2)}</span>
           </>
         }
       />
@@ -274,6 +275,7 @@ function ParameterRows() {
         desc={t("settings.fovDesc")}
         control={
           <>
+            <span className="settings-slider-value">{Math.round(fov)}°</span>
             <input
               id="settings-fov"
               type="range"
@@ -283,7 +285,6 @@ function ParameterRows() {
               value={Math.round(fov)}
               onChange={(event) => setFov(Number(event.target.value))}
             />
-            <span className="settings-slider-value">{Math.round(fov)}°</span>
           </>
         }
       />
@@ -293,6 +294,7 @@ function ParameterRows() {
         desc={t("settings.renderDistanceDesc")}
         control={
           <>
+            <span className="settings-slider-value">{Math.round(renderDistance)}</span>
             <input
               id="settings-render-distance"
               type="range"
@@ -302,7 +304,6 @@ function ParameterRows() {
               value={Math.round(renderDistance)}
               onChange={(event) => setRenderDistance(Number(event.target.value))}
             />
-            <span className="settings-slider-value">{Math.round(renderDistance)}</span>
           </>
         }
       />
@@ -435,6 +436,7 @@ function ParameterRows() {
         desc={t("settings.volumeHint")}
         control={
           <>
+            <span className="settings-slider-value">{Math.round(volume)}%</span>
             <input
               id="settings-volume"
               type="range"
@@ -444,7 +446,6 @@ function ParameterRows() {
               value={Math.round(volume)}
               onChange={(event) => setVolume(Number(event.target.value))}
             />
-            <span className="settings-slider-value">{Math.round(volume)}%</span>
           </>
         }
       />

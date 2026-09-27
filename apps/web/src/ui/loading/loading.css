@@ -209,3 +209,46 @@
   bottom: 0;
   background: #0ff796;
 }
+
+/* ---------- 下载态素材（索引容器下载期间；流式态为实测构图的大百分比，无这些元素） ---------- */
+
+/* logo 字标：768x120 顶部居中（zh/tw 中文版、en/ru 英文版，与 boot 屏同素材）。 */
+.scene-loading-logo {
+  position: absolute;
+  left: 50%;
+  top: calc(38px * var(--ui-scale));
+  transform: translateX(-50%);
+  width: calc(768px * var(--ui-scale));
+  height: calc(120px * var(--ui-scale));
+  object-fit: contain;
+  pointer-events: none;
+}
+
+/* slogan：641x282 居中于进度区（位置为应用侧界定——上游下载态无实测构图）。 */
+.scene-loading-slogan {
+  position: absolute;
+  left: 50%;
+  top: calc(440px * var(--ui-scale));
+  transform: translateX(-50%);
+  width: calc(641px * var(--ui-scale));
+  height: calc(282px * var(--ui-scale));
+  object-fit: contain;
+  pointer-events: none;
+}
+
+/* 「正在下载 N%」：下载态进度区的进度行（绿 32px，slogan 下方）。 */
+.scene-loading-downloading {
+  position: absolute;
+  left: 50%;
+  top: calc(740px * var(--ui-scale));
+  transform: translateX(-50%);
+  width: calc(553px * var(--ui-scale));
+  height: calc(50px * var(--ui-scale));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #0ff796;
+  font-size: calc(32px * var(--ui-scale));
+  font-weight: 400;
+  white-space: nowrap;
+}

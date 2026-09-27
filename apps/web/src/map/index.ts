@@ -1,5 +1,6 @@
 export type { MapCode, MapDefinition, MapId, PlacementInstance } from "./types";
 export { DEFAULT_MAP_ID, getMapByCode, getMapById, MAPS, MAP_IDS } from "./registry";
+export { getMapModeById, MAP_MODES, type MapModeDefinition } from "./mapModes";
 export {
   degreesToRadians,
   mirrorZPosition,

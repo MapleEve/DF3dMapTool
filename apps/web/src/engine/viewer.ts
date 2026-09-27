@@ -11,13 +11,14 @@ import { MapCameraControls } from "./cameraControls";
 import { MapSceneLayer } from "./mapScene";
 import { projectToScreen, type ScreenAnchor } from "./poiProjector";
 import type { ChunkProgressListener, ChunkStreamStats } from "./mapScene";
-import { SceneManager } from "./SceneManager";
+import { SceneManager, type EngineLayer } from "./SceneManager";
 import { NavPathLayer } from "./navmesh/navPathLayer";
 import { openNavMesh } from "./navmesh/loader";
 import type { NavMesh, NavPath } from "./navmesh/navmesh";
 import { InteractorLayer, type NearbyInteractor } from "./interactorLayer";
-import { RouteLayer } from "./routeLayer";
+import { RouteLayer, type RouteRenderMode } from "./routeLayer";
 import { ziplineDurationSeconds } from "./routeFollow";
+import { createMotesLayer } from "./motesLayer";
 import type { InteractorsDoc } from "@/data/routes";
 
 const CAMERA_LAYER_ID = "camera-controls";
@@ -63,6 +64,8 @@ export class MapViewer {
   #navPathLayer: NavPathLayer | null = null;
   #routeLayer: RouteLayer | null = null;
   #interactorLayer: InteractorLayer | null = null;
+  /** 环境漂浮粒子层（「环境漂浮粒子」设置项；跨地图常驻，随视口生命周期）。 */
+  #motesLayer: EngineLayer | null = null;
   /** 视野渲染距离（米）；null = 未设置（沿用 SceneManager 默认 far/雾）。 */
   #renderDistance: number | null = null;
 
@@ -274,8 +277,12 @@ export class MapViewer {
 
   // ---- 路线系统 ----
 
-  /** 显示/清空选中路线的 3D 主线与标注点。 */
-  setRouteDisplay(points: readonly Vec3[] | null, markers?: readonly Vec3[]): void {
+  /** 显示/清空选中路线的 3D 主线与标注点（renderMode 为导航启动时的渲染模式）。 */
+  setRouteDisplay(
+    points: readonly Vec3[] | null,
+    markers?: readonly Vec3[],
+    renderMode?: RouteRenderMode,
+  ): void {
     if (points === null) {
       this.#routeLayer?.setRoute(null);
       return;
@@ -285,7 +292,15 @@ export class MapViewer {
       this.#manager.addLayer(layer);
       this.#routeLayer = layer;
     }
-    this.#routeLayer.setRoute(points, markers);
+    this.#routeLayer.setRoute(points, markers, renderMode !== undefined ? { renderMode } : {});
+  }
+
+  /**
+   * 分段渲染进度：跟跑回放按当前点位下标推进主线可见窗口；
+   * null 恢复全程。全程模式下 no-op；路线未显示时安全忽略。
+   */
+  setRouteSegmentIndex(index: number | null): void {
+    this.#routeLayer?.setSegmentIndex(index);
   }
 
   /**
@@ -340,6 +355,29 @@ export class MapViewer {
     this.#interactorLayer?.setHighlight(nearby);
   }
 
+  // ---- 环境漂浮粒子 ----
+
+  /**
+   * 开关环境漂浮粒子层（「环境漂浮粒子」设置项的真实效果）。
+   * 粒子环绕相机注视点漂浮；层跨地图常驻（不随换图卸载），随视口销毁。
+   */
+  setAmbientMotes(enabled: boolean): void {
+    if (enabled) {
+      if (this.#motesLayer === null) {
+        const layer = createMotesLayer({
+          getFocus: () => this.#controls?.target ?? null,
+        });
+        this.#manager.addLayer(layer);
+        this.#motesLayer = layer;
+      }
+      return;
+    }
+    if (this.#motesLayer !== null) {
+      this.#manager.removeLayer(this.#motesLayer.id);
+      this.#motesLayer = null;
+    }
+  }
+
   /** F 键交互动作：梯子/绳索=传送（缓动飞抵对端）；滑索=按数据速度滑行。 */
   interact(nearby: NearbyInteractor): void {
     const controls = this.#controls;
@@ -362,12 +400,12 @@ export class MapViewer {
     void controls.flyTo(nearby.target, controls.getDistance());
   }
 
-  /** 回出生点：复位到进场取景位；地图未加载时返回 false。 */
-  respawn(): boolean {
+  /** 回出生点：硬传送（加载遮罩下）到指定出生点（缺省=进场取景位）；地图未加载返回 false。 */
+  respawn(position?: Vec3 | null): boolean {
     if (this.#controls === null) {
       return false;
     }
-    this.#controls.respawn();
+    this.#controls.respawnAt(position);
     return true;
   }
 

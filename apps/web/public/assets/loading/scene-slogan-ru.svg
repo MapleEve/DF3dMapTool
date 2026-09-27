@@ -1,0 +1,6 @@
+<svg width="641" height="282" viewBox="0 0 641 282" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Slogan экрана загрузки сцены (русский). Размер 641x282 соответствует слоту; текст — наш. -->
+  <text x="320.5" y="118" text-anchor="middle" fill="#62F5BD" font-family="'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="50" font-weight="700">Освойте каждую карту в 3D</text>
+  <text x="320.5" y="196" text-anchor="middle" fill="#62F5BD" font-family="'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="34" font-weight="500">Маршруты · Точки интереса · Этажи</text>
+  <text x="320.5" y="252" text-anchor="middle" fill="#62F5BD" fill-opacity="0.85" font-family="'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="24" font-weight="400">Шесть карт в комплекте · сразу готово</text>
+</svg>

@@ -23,7 +23,8 @@ const clamp = MathUtils.clamp;
  * - 视角灵敏度可调（对齐灵敏度设置项；设置面板实时下发）；
  * - POI 搜索定位走 flyTo 缓动飞行，用户一有输入立即中断；
  *   2D 标记 → 3D 传送同样经 flyTo；
- * - 回出生点 respawn() 复位到进场取景位（设置面板可触发）。
+ * - 回出生点 respawnAt() 硬传送（加载遮罩下执行）到出生点集随机落点
+ *   （缺省=进场取景位；R 键/设置面板触发）。
  */
 export interface CameraLimits {
   /** 场景世界包围盒（平移注视点约束在此范围内）。 */
@@ -51,7 +52,8 @@ export interface CameraLimitsInput {
 const DEFAULT_ELEVATION: readonly [number, number] = [8, 85];
 const DEFAULT_DISTANCE: readonly [number, number] = [15, 1500];
 const DEFAULT_FOV_RANGE: readonly [number, number] = [30, 100];
-const DEFAULT_FOV = 70;
+/** 默认 FOV 75：上游设置面板实测默认值（换图后由设置面板值即时覆盖）。 */
+const DEFAULT_FOV = 75;
 const GROUND_MARGIN = 2;
 
 interface FlyAnimation {
@@ -139,7 +141,7 @@ export class MapCameraControls extends OrbitControls {
     return this.perspectiveCamera.fov;
   }
 
-  /** 视角灵敏度（对齐设置项，1 为默认手感）。 */
+  /** 视角灵敏度（对齐设置项；默认 0.45 为上游实测默认）。 */
   setSensitivity(sensitivity: number): void {
     this.rotateSpeed = clamp(sensitivity, 0.1, 3);
   }
@@ -233,9 +235,29 @@ export class MapCameraControls extends OrbitControls {
     return this.#routeFollow !== null;
   }
 
-  /** 回出生点：复位到进场取景位。 */
-  respawn(): void {
-    void this.flyTo(this.#spawnTarget, this.#spawnDistance, 500);
+  /**
+   * 回出生点：硬传送（加载遮罩下执行，无缓动）到给定出生点
+   * （position 缺省/null = 进场取景位）。取景几何与进场一致：
+   * 东南 45° 方位、仰角取限制区间中值、视距为进场取景距。
+   */
+  respawnAt(position?: Vec3 | null): void {
+    this.cancelRouteFollow();
+    this.cancelFlyTo();
+    const target =
+      position === null || position === undefined
+        ? this.#spawnTarget.clone()
+        : new Vector3(position.x, position.y, position.z);
+    const [minElevation, maxElevation] = this.#limits.elevationRange;
+    const elevation = (((minElevation + maxElevation) / 2) * Math.PI) / 180;
+    const horizontal = Math.cos(elevation) * this.#spawnDistance;
+    this.target.copy(target);
+    this.perspectiveCamera.position.set(
+      target.x + horizontal * Math.SQRT1_2,
+      Math.max(target.y + Math.sin(elevation) * this.#spawnDistance, this.#limits.minCameraHeight),
+      target.z + horizontal * Math.SQRT1_2,
+    );
+    this.perspectiveCamera.lookAt(this.target);
+    this.update();
   }
 
   /** 以场景包围盒取景：设置进场注视点/视距与出生点位。 */

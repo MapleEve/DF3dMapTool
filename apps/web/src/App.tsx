@@ -13,8 +13,10 @@ import { Sidebar } from "./ui/Sidebar";
 import { StatusBar } from "./ui/StatusBar";
 import { TopBar } from "./ui/TopBar";
 import { ViewCouplingBridge } from "./ui/ViewCouplingBridge";
+import { WebglGuideTip } from "./ui/WebglGuideTip";
 import { LoadingFlow } from "./ui/loading/LoadingFlow";
 import { useHomeStore } from "./ui/homeStore";
+import { startAmbientAudio } from "@/audio/ambientAudio";
 import { useUiStore } from "./state/uiStore";
 import { useViewStore } from "./state/viewStore";
 import { useRouteStore } from "./state/routeStore";
@@ -94,6 +96,20 @@ export default function App() {
     }
   }, [view, setBigmapOpen]);
 
+  // 环境音（音量设置项的真实效果）：首次用户手势后启动（浏览器自动播放
+  // 策略要求手势内创建 AudioContext）；音量增益此后随设置滑条实时变化。
+  useEffect(() => {
+    const start = () => {
+      startAmbientAudio(useUiStore.getState().volume);
+    };
+    window.addEventListener("pointerdown", start, { once: true });
+    window.addEventListener("keydown", start, { once: true });
+    return () => {
+      window.removeEventListener("pointerdown", start);
+      window.removeEventListener("keydown", start);
+    };
+  }, []);
+
   return (
     <div className="app-root">
       {/* 3D 场景保持挂载：2D 视图下隐藏并暂停渲染循环（相机/分块缓存/标注全保留，切回零成本）。 */}
@@ -114,6 +130,8 @@ export default function App() {
       <MapSelectScreen />
       {/* 加载流程：启动 boot 屏 → 选图屏/进图屏（大百分比）→ 3D 视图，完成均为硬切。 */}
       <LoadingFlow />
+      {/* WebGL 引导提示（#65）：WebGL 不可用的客户端首访降级引导；2D 沙盘不受影响。 */}
+      <WebglGuideTip />
     </div>
   );
 }

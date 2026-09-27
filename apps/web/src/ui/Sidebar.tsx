@@ -3,9 +3,11 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { POI_CATEGORIES } from "@/poi";
 import type { PoiCategory, PoiCategoryId, PoiDefinition } from "@/poi/types";
+import { passesPoiFilter } from "@/poi/filter";
 import { searchPois } from "@/poi/search";
 import { useFloorStore } from "@/state/floorStore";
 import { useMapDataStore } from "@/state/mapDataStore";
+import { useMapModeStore } from "@/state/mapModeStore";
 import { useMapStore } from "@/state/mapStore";
 import { usePoiFilterStore } from "@/state/poiFilterStore";
 import { usePoiStore } from "@/state/poiStore";
@@ -36,6 +38,7 @@ export function Sidebar() {
   const showAllCategories = usePoiFilterStore((state) => state.showAllCategories);
   const hideAllCategories = usePoiFilterStore((state) => state.hideAllCategories);
   const query = useSearchStore((state) => state.query);
+  const mode = useMapModeStore((state) => state.mode);
   const setQuery = useSearchStore((state) => state.setQuery);
   const clearQuery = useSearchStore((state) => state.clearQuery);
   const selectPoi = usePoiStore((state) => state.selectPoi);
@@ -49,12 +52,16 @@ export function Sidebar() {
     if (poiData === null) {
       return [] as readonly { poi: PoiDefinition; category?: PoiCategory }[];
     }
-    const matches = searchPois(poiData.pois, query, 100);
+    // 检索范围限定当前玩法模式的 POI 集（模式选择后其余模式点位不参与匹配）。
+    const scoped = poiData.pois.filter((poi) =>
+      passesPoiFilter(poi, { hiddenCategories: [], floor: null, mode }),
+    );
+    const matches = searchPois(scoped, query, 100);
     return matches.map((match) => ({
       poi: match.item,
       category: poiData.categories.find((entry) => entry.id === match.item.categoryId),
     }));
-  }, [poiData, query]);
+  }, [poiData, query, mode]);
 
   if (!sidebarOpen) {
     return null;

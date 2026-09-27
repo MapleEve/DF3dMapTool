@@ -1,6 +1,12 @@
 import { create } from "zustand";
+import { applyAmbientVolume } from "@/audio/ambientAudio";
 import type { Vec3 } from "@/common/geometry";
-import { changeLanguage, readStoredLanguage, LANGUAGE_STORAGE_KEY, type Language } from "@/i18n";
+import {
+  changeLanguage,
+  resolveInitialLanguage,
+  LANGUAGE_STORAGE_KEY,
+  type Language,
+} from "@/i18n";
 
 /** 画质档位：映射到渲染像素比上限（低 1 / 中 1.5 / 高 2）。 */
 export type QualityLevel = "low" | "medium" | "high";
@@ -11,15 +17,16 @@ export const QUALITY_PIXEL_RATIO: Readonly<Record<QualityLevel, number>> = {
   high: 2,
 };
 
-/** 相机视场角范围与默认值（度），与 MapCameraLimits.fovRange 对齐。 */
+/** 相机视场角范围与默认值（度），与 MapCameraLimits.fovRange 对齐；默认 75 为上游实测默认。 */
 export const FOV_RANGE = [30, 100] as const;
-export const FOV_DEFAULT = 70;
+export const FOV_DEFAULT = 75;
 
 /**
- * 视角灵敏度范围与默认值（1 为默认手感），与引擎 setSensitivity 钳制对齐。
+ * 视角灵敏度范围与默认值（上游实测默认 0.45），与引擎 setSensitivity 钳制对齐；
+ * 滑条上下界为应用侧界定（上游仅提供当前值，无范围口径）。
  */
 export const SENSITIVITY_RANGE = [0.2, 3] as const;
-export const SENSITIVITY_DEFAULT = 1;
+export const SENSITIVITY_DEFAULT = 0.45;
 
 /**
  * 视野渲染距离范围与默认值（米）。默认 200 为上游实测值（设置页参数行）；
@@ -115,7 +122,7 @@ interface UiStoreState {
   quality: QualityLevel;
   /** 相机视场角（度）。 */
   fov: number;
-  /** 视角灵敏度（1 为默认手感）。 */
+  /** 视角灵敏度（上游实测默认 0.45）。 */
   sensitivity: number;
   /** 视野渲染距离（米）：相机远平面/雾的可见范围（设置面板参数行）。 */
   renderDistance: number;
@@ -123,17 +130,19 @@ interface UiStoreState {
   frameLimit: FrameLimitLevel;
   /** 抗锯齿（重建渲染器才生效，重启页面后应用）。 */
   antialias: boolean;
-  /** 空中跳跃（上游对齐设置项；模拟器无角色控制，仅保存偏好）。 */
+  /** 空中跳跃（上游对齐设置项；轨道相机无角色跳跃，有意差异：仅保存偏好）。 */
   airJump: boolean;
-  /** 音量百分比 0..100（模拟器暂无音频输出，仅保存偏好）。 */
+  /** 音量百分比 0..100（WebAudio 实时合成环境音的主增益）。 */
   volume: number;
-  /** 环境漂浮粒子（模拟器暂无对应视觉系统，仅保存偏好）。 */
+  /** 环境漂浮粒子（场景粒子层开关，即时增删）。 */
   ambientMotes: boolean;
   cameraHud: CameraHud | null;
   /** 视口注册的截图执行器（null 表示视口未就绪）。 */
   screenshotHandler: (() => void) | null;
   /** 视口注册的回出生点执行器（null 表示视口未就绪）。 */
   respawnHandler: (() => void) | null;
+  /** 回出生点加载遮罩在屏（遮罩期间相机已传送就位，定时硬切卸载）。 */
+  respawnCoverOpen: boolean;
   toggleSidebar: () => void;
   setSidebarOpen: (open: boolean) => void;
   toggleBigmap: () => void;
@@ -152,6 +161,7 @@ interface UiStoreState {
   setCameraHud: (hud: CameraHud | null) => void;
   registerScreenshot: (handler: (() => void) | null) => void;
   registerRespawn: (handler: (() => void) | null) => void;
+  setRespawnCoverOpen: (open: boolean) => void;
   /** 执行回出生点（视口未就绪时静默忽略）。 */
   requestRespawn: () => void;
 }
@@ -160,7 +170,7 @@ export const useUiStore = create<UiStoreState>()((set, get) => ({
   sidebarOpen: true,
   bigmapOpen: false,
   settingsOpen: false,
-  language: readStoredLanguage(),
+  language: resolveInitialLanguage(),
   quality: readStoredQuality(),
   fov: readStoredNumber(STORAGE_KEY_FOV, FOV_RANGE, FOV_DEFAULT),
   sensitivity: readStoredNumber(STORAGE_KEY_SENSITIVITY, SENSITIVITY_RANGE, SENSITIVITY_DEFAULT),
@@ -177,6 +187,7 @@ export const useUiStore = create<UiStoreState>()((set, get) => ({
   cameraHud: null,
   screenshotHandler: null,
   respawnHandler: null,
+  respawnCoverOpen: false,
   toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
   setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),
   toggleBigmap: () => set((state) => ({ bigmapOpen: !state.bigmapOpen })),
@@ -222,6 +233,8 @@ export const useUiStore = create<UiStoreState>()((set, get) => ({
     const next = clampRange(volume, [0, 100], 80);
     persist(STORAGE_KEY_VOLUME, String(Math.round(next)));
     set({ volume: next });
+    // 音量设置项的真实效果：WebAudio 环境音实时增益（无 WebAudio 时静默降级）。
+    applyAmbientVolume(next);
   },
   setAmbientMotes: (ambientMotes) => {
     persist(STORAGE_KEY_AMBIENT_MOTES, ambientMotes ? "1" : "0");
@@ -230,6 +243,7 @@ export const useUiStore = create<UiStoreState>()((set, get) => ({
   setCameraHud: (cameraHud) => set({ cameraHud }),
   registerScreenshot: (screenshotHandler) => set({ screenshotHandler }),
   registerRespawn: (respawnHandler) => set({ respawnHandler }),
+  setRespawnCoverOpen: (respawnCoverOpen) => set({ respawnCoverOpen }),
   requestRespawn: () => {
     const handler = get().respawnHandler;
     handler?.();

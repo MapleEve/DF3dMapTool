@@ -4,21 +4,25 @@ import type { Language } from "./index";
  * 2D 沙盘数据名称的语言解析链（设计文档 §3.2 语言矩阵，不走 i18next——数据名称是数据包字段而非 UI 文案）。
  *
  * 数据包（sandbox2d.dmap data.json）语言字段族：
- * - regions: { nameEn, nameZhTw, nameZh }   nameZh = 站点 tw 名繁→简（管线 sandbox2d_lang.mjs 完成转换）
+ * - regions: { nameEn, nameZhTw, nameZh }   nameZh = nameZhTw 繁→简（管线 sandbox2d_lang.mjs 完成转换）
  * - points:  { nameEn, titleEn, titleZh, descEn }
  * - legend:  { nameEn }（站点三 locale 图例均显英文，如实对齐：全语言恒英文）
  *
  * 解析矩阵：
- * | 实体     | zh        | en        | ja / ko   |
- * | 区域名   | nameZh→nameEn | nameEn→nameZh | 走 zh 链 |
- * | POI 标题 | titleZh→titleEn | titleEn→titleZh | 走 zh 链 |
- * | 图例名   | nameEn（全语言） | nameEn | nameEn |
- * | POI 描述 | descEn（全语言，站点无任何翻译） | | |
+ * | 实体     | zh            | en / ru      | tw                        |
+ * | 区域名   | nameZh→nameEn | nameEn→nameZh | nameZhTw→nameZh→nameEn    |
+ * | POI 标题 | titleZh→titleEn | titleEn→titleZh | titleZh→titleEn（zh 链）|
+ * | 图例名   | nameEn（全语言） |              |                          |
+ * | POI 描述 | descEn（全语言，站点无任何翻译） |                          |
+ *
+ * ru 无数据包译文：走 en 链（站点 ru 页的数据标签同为英文回退）；
+ * tw 区域名优先 nameZhTw（数据包携带的繁体原名），POI 标题无繁体字段、走 zh 链。
  */
 
 /** 2D 沙盘区域名的语言字段（sandbox2d 数据包 regions 条目的名称子集）。 */
 export interface SandboxRegionNameFields {
   readonly nameEn: string | null;
+  readonly nameZhTw: string | null;
   readonly nameZh: string | null;
 }
 
@@ -47,25 +51,30 @@ function firstNonEmpty(...values: readonly (string | null)[]): string | null {
   return null;
 }
 
-/** 区域名：zh（及 ja/ko 回退 zh 链）→ nameZh→nameEn；en → nameEn→nameZh。 */
+/** 区域名：zh → nameZh→nameEn；tw → nameZhTw→nameZh→nameEn；en/ru → nameEn→nameZh。 */
 export function resolveSandboxRegionName(
   region: SandboxRegionNameFields,
   locale: Language,
 ): string | null {
-  return locale === "en"
-    ? firstNonEmpty(region.nameEn, region.nameZh)
-    : firstNonEmpty(region.nameZh, region.nameEn);
+  if (locale === "tw") {
+    return firstNonEmpty(region.nameZhTw, region.nameZh, region.nameEn);
+  }
+  if (locale === "zh") {
+    return firstNonEmpty(region.nameZh, region.nameEn);
+  }
+  return firstNonEmpty(region.nameEn, region.nameZh);
 }
 
-/** POI 标题（物品名）：zh（及 ja/ko 回退 zh 链）→ titleZh→titleEn；en → titleEn→titleZh。
+/** POI 标题（物品名）：zh/tw → titleZh→titleEn；en/ru → titleEn→titleZh。
  *  两字段均缺（如 rare_spawn 点位）返回 null，由调用侧回退图例名。 */
 export function resolveSandboxPointTitle(
   point: SandboxPointNameFields,
   locale: Language,
 ): string | null {
-  return locale === "en"
-    ? firstNonEmpty(point.titleEn, point.titleZh)
-    : firstNonEmpty(point.titleZh, point.titleEn);
+  if (locale === "en" || locale === "ru") {
+    return firstNonEmpty(point.titleEn, point.titleZh);
+  }
+  return firstNonEmpty(point.titleZh, point.titleEn);
 }
 
 /** POI 悬浮/搜索标签：上游规则 name || title，name 为站点英文专名、title 按语言链解析。 */

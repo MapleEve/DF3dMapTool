@@ -11,7 +11,7 @@ const DESIGN_HEIGHT = 1080;
 
 /**
  * 启动加载屏：全屏渐变底 + logo + lottie 循环动画 + 「加载中...」+ 提示轮换。
- * 结构/类名/ID/字号/色值按实测复刻；无任何进度条（原站口径）。
+ * 结构/类名/ID/字号/色值按实测复刻；无任何进度条（既定口径）。
  * 覆盖整个应用壳，首帧即显示；由 LoadingFlow 在启动加载完成时卸载（硬切）。
  */
 export function BootLoadingScreen() {

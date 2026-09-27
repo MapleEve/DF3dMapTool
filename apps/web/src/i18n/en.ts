@@ -1,6 +1,6 @@
 import type { TranslationSchema } from "./zh";
 
-/** English resources. Must stay structurally identical to zh.ts / ja.ts / ko.ts. */
+/** English resources. Must stay structurally identical to zh.ts / ru.ts / tw.ts. */
 export const en: TranslationSchema = {
   app: {
     title: "DF3dMapTool",
@@ -21,6 +21,11 @@ export const en: TranslationSchema = {
     label: "Floor",
     floorName: "Floor {{floor}}",
     basement: "Basement {{floor}}",
+  },
+  mapMode: {
+    normal: "Regular",
+    confidential: "Classified",
+    topSecret: "Top Secret",
   },
   poiCategory: {
     extract: "Extraction",
@@ -142,6 +147,8 @@ export const en: TranslationSchema = {
     needCalibration: "No overhead calibration data for this map yet",
     overviewFloor: "Overview",
     floorTitle: "Floor switch",
+    modeTitle: "Game Mode",
+    modeHint: "Switching shows only points for that mode",
     zoomIn: "Zoom in",
     zoomOut: "Zoom out",
     zoomSlider: "Zoom level",
@@ -164,16 +171,28 @@ export const en: TranslationSchema = {
     keyDrag: "Drag",
     keyRightDrag: "Right-drag",
     keyWheel: "Wheel",
+    keyQ: "Q",
+    keyR: "R",
+    keyF: "F",
     keyM: "M",
     keyEsc: "Esc",
     keyTab: "Tab",
     rotate: "Rotate view",
     pan: "Pan view",
     zoom: "Zoom",
+    routeNav: "Route Navigation",
+    respawn: "Respawn",
+    interact: "Interact",
     bigmap: "Toggle Map",
     settings: "Settings Menu",
     show: "Show Controls",
     hide: "Hide Controls",
+  },
+  // WebGL guide tip (shown when the browser cannot render the 3D view).
+  webglGuide: {
+    title: "3D view unavailable",
+    body: "This browser does not support WebGL, so the 3D scene cannot be rendered. Please switch to a modern browser with WebGL; the 2D sandbox view is unaffected.",
+    dismiss: "Got it",
   },
   home: {
     mapSelect: "Select map",
@@ -221,12 +240,11 @@ export const en: TranslationSchema = {
     respawn: "Return to spawn",
     respawnAction: "Back to entry view",
     airJump: "Air Jump",
-    airJumpHint: "This simulator has no character controller; the preference is stored only.",
+    airJumpHint: "The orbit camera has no character jump; this preference is stored only.",
     volume: "Volume",
-    volumeHint: "The simulator has no audio output yet; the preference is stored only.",
+    volumeHint: "Controls the ambient soundscape (synthesized live via WebAudio; no audio assets).",
     ambientMotes: "Ambient motes",
-    ambientMotesHint:
-      "No particle system is built in this scene yet; the preference is stored only.",
+    ambientMotesHint: "Drifting ambient motes in the scene; turning it off removes them at once.",
     on: "On",
     off: "Off",
     qualityLevels: {

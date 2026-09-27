@@ -324,7 +324,7 @@ export function Sandbox2dView() {
       item: string;
     }) => {
       // 下拉文案 `${name} (${title ?? item_id})`：括号内为物品名语言链
-      //（resolveSandboxPointTitle：zh→titleZh、en→titleEn），两字段均缺回退 item_id；
+      //（resolveSandboxPointTitle：zh/tw→titleZh、en/ru→titleEn），两字段均缺回退 item_id；
       // 具名位 name 不进括号（否则「X (X)」自重复）。
       const title = resolveSandboxPointTitle(point, language) ?? point.item;
       return point.nameEn !== null ? `${point.nameEn} (${title})` : title;

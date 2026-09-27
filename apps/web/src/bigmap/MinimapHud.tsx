@@ -4,6 +4,7 @@ import { getIconObjectUrl, resolveFloorEntry, type RawMap2dFloor } from "@/data"
 import { filterPois } from "@/poi/filter";
 import { useFloorStore } from "@/state/floorStore";
 import { useMapDataStore } from "@/state/mapDataStore";
+import { useMapModeStore } from "@/state/mapModeStore";
 import { useMapStore } from "@/state/mapStore";
 import { usePoiFilterStore } from "@/state/poiFilterStore";
 import { usePoiStore } from "@/state/poiStore";
@@ -203,6 +204,7 @@ export function MinimapHudContainer() {
   const poiData = useMapDataStore((state) => state.poiData);
   const floor = useFloorStore((state) => state.floor);
   const hiddenCategories = usePoiFilterStore((state) => state.hiddenCategories);
+  const mode = useMapModeStore((state) => state.mode);
   const selectedPoiId = usePoiStore((state) => state.selectedPoiId);
 
   const pkg = bundle?.pkg ?? null;
@@ -233,12 +235,12 @@ export function MinimapHudContainer() {
     return { width: floorEntry.imageSize[0] ?? 0, height: floorEntry.imageSize[1] ?? 0 };
   }, [floorEntry]);
 
-  // POI：与 2D 大地图同一份筛选源（分类隐藏 + 当前楼层 + hideInBigmap）。
+  // POI：与 2D 大地图同一份筛选源（分类隐藏 + 当前楼层 + 模式 + hideInBigmap）。
   const pois = useMemo(() => {
     if (poiData === null) {
       return [];
     }
-    return filterPois(poiData.pois, { hiddenCategories, floor })
+    return filterPois(poiData.pois, { hiddenCategories, floor, mode })
       .filter((poi) => poi.hiddenInBigmap !== true)
       .map((poi) => ({
         id: poi.id,
@@ -247,7 +249,7 @@ export function MinimapHudContainer() {
           poiData.categories.find((category) => category.id === poi.categoryId)?.color ?? "#8fa3b8",
         selected: poi.id === selectedPoiId,
       }));
-  }, [poiData, hiddenCategories, floor, selectedPoiId]);
+  }, [poiData, hiddenCategories, floor, mode, selectedPoiId]);
 
   const regions = useMemo(() => {
     if (poiData === null) {
