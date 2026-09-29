@@ -513,6 +513,119 @@ describe("MapSceneLayer · v3 单层包（无 lods 表）行为不变", () => {
   });
 });
 
+/** 手动（延迟执行）调度器：排空请求只捕获不执行，测试显式驱动装配时点。 */
+function deferredScheduler() {
+  const pending: (() => void)[] = [];
+  return {
+    scheduler: (run: () => void) => {
+      pending.push(run);
+    },
+    flush() {
+      while (pending.length > 0) {
+        pending.shift()!();
+      }
+    },
+  };
+}
+
+/** 等微任务排空（fetch / 解析 promise 链推进）。 */
+const microtasks = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+describe("MapSceneLayer · 帧预算装配队列（拉取与装配分段）", () => {
+  it("拉取完成与装配分段：pending 口径含装配在途，排空后挂载、进度 100%", async () => {
+    const fixture = await buildTieredFixture(SPECS);
+    const deferred = deferredScheduler();
+    const layer = new MapSceneLayer(fixture.pkg, fixture.sceneDoc, fixture.floors, {
+      ...layerOptions(),
+      assemblyScheduler: deferred.scheduler,
+    });
+    const focus: Vec3 = { x: 0, y: 0, z: 0 };
+    layer.attachCamera(topDownCamera());
+    layer.setFocusProvider(() => focus);
+
+    layer.update(0.3); // 规划 + 提交（update 内的 tick 时队列为空）
+    await microtasks(); // 池任务拉取完成 → 装配队列入队
+    const midStats = layer.stats;
+    // 池已排空（拉取即完成）、装配在途 2 条：pending 必须计入装配队列，
+    // 否则进度 UI 会在装配完成前误报「已就位」。
+    expect(midStats.pendingChunks).toBe(2);
+    expect(midStats.loadedChunks).toBe(0);
+    expect(mountedTags(fixture.floors)).toEqual([]);
+
+    deferred.flush(); // 排空：启动解析
+    await microtasks(); // 解析完成 → ready
+    deferred.flush(); // 排空：装配挂载
+    await microtasks();
+    await settle(layer);
+    expect(mountedTags(fixture.floors).toSorted()).toEqual(["0_0@l0", "1_0@l2"]);
+    expect(layer.stats.fraction).toBe(1);
+    expect(layer.stats.pendingChunks).toBe(0);
+    layer.dispose();
+  });
+
+  it("待装配条目随应载集离开被清扫：不挂载、无残留 pending、无重复拉取", async () => {
+    const fixture = await buildTieredFixture(SPECS);
+    const deferred = deferredScheduler();
+    const layer = new MapSceneLayer(fixture.pkg, fixture.sceneDoc, fixture.floors, {
+      ...layerOptions(),
+      assemblyScheduler: deferred.scheduler,
+    });
+    let focus: Vec3 = { x: 0, y: 0, z: 0 };
+    layer.attachCamera(topDownCamera());
+    layer.setFocusProvider(() => focus);
+
+    layer.update(0.3); // 提交 A@l0 + B@l2
+    await microtasks(); // 拉取完成 → 入队（排空请求挂起，装配未开始）
+    deferred.flush(); // 启动解析（合成 GLB 在微任务内完成）
+    // 视线中心跳出渲染半径：规划把两块移出应载集，update 内的 tick
+    // 随即清扫 parsing 条目（drop(null)）；解析完成后场景经 drop 释放。
+    focus = { x: 10000, y: 0, z: 0 };
+    layer.update(0.3);
+    await microtasks(); // 在途解析完成 → 迟到场景走 drop 释放路径
+    deferred.flush(); // 迟到的排空请求：无动作
+    await settle(layer);
+
+    expect(mountedTags(fixture.floors)).toEqual([]);
+    expect(layer.stats.loadedChunks).toBe(0);
+    expect(layer.stats.pendingChunks).toBe(0);
+    // 应载集为空：分母归零，进度守卫为 1。
+    expect(layer.stats.totalInstances).toBe(0);
+    expect(layer.stats.fraction).toBe(1);
+    // 拉取阶段各容器只拉过一次（清扫丢弃不重拉）。
+    expect(fixture.fetchLog.length).toBe(2);
+    layer.dispose();
+  });
+
+  it("装配在途去重：池槽位释放后规划不重复提交同层任务", async () => {
+    const fixture = await buildTieredFixture(SPECS);
+    const deferred = deferredScheduler();
+    const layer = new MapSceneLayer(fixture.pkg, fixture.sceneDoc, fixture.floors, {
+      ...layerOptions(),
+      assemblyScheduler: deferred.scheduler,
+    });
+    const focus: Vec3 = { x: 0, y: 0, z: 0 };
+    layer.attachCamera(topDownCamera());
+    layer.setFocusProvider(() => focus);
+
+    layer.update(0.3); // 提交 A@l0 + B@l2
+    await microtasks(); // 拉取完成 → 入队（池任务已结算、键位释放）
+    // 再次规划（装配仍在途）：不得因池键释放而重复提交同层任务。
+    layer.update(0.3);
+    await microtasks();
+    // 仍是 2 条装配在途（重复提交会在此窗口多出池任务）。
+    expect(layer.stats.pendingChunks).toBe(2);
+
+    deferred.flush();
+    await microtasks();
+    deferred.flush();
+    await settle(layer);
+    // 每块恰挂一层，无重复装配。
+    expect(mountedTags(fixture.floors).toSorted()).toEqual(["0_0@l0", "1_0@l2"]);
+    expect(layer.stats.fraction).toBe(1);
+    layer.dispose();
+  });
+});
+
 describe("disposeObject3D · 材质纹理槽位释放", () => {
   it("释放材质时一并释放其纹理引用", () => {
     const object = new Object3D();

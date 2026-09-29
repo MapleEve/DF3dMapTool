@@ -38,6 +38,8 @@ export type { ScreenAnchor } from "./poiProjector";
 // 地图图层与视图门面
 export { MapSceneLayer } from "./mapScene";
 export type { ChunkProgressListener, ChunkStreamStats, MapSceneLayerOptions } from "./mapScene";
+export { AssemblyQueue, defaultAssemblyScheduler } from "./assemblyQueue";
+export type { AssemblyJob, AssemblyQueueOptions, AssemblyScheduler } from "./assemblyQueue";
 export { MapViewer } from "./viewer";
 export type { MapViewerOptions, ViewerLoadOptions, ViewerLoadState } from "./viewer";
 

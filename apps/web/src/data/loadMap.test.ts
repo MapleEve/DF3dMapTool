@@ -17,8 +17,14 @@ import { stubGlobal, unstubAllGlobals } from "@/testing/globals";
 const AZ3_URL = getMapById(106)?.bundleUrl ?? "/assets/az3/index.dmap";
 const AZ3_CHUNK_URL = "/assets/az3/chunks/c_0_0.dmap";
 
-/** Batch2（dmap-map-manifest/2 单图容器）发布时的实测基线；分片重打包不得改变任何规模。 */
-const BATCH2_BASELINE: Record<
+/**
+ * 声明规模基线（回归锚点）：chunks/instances/geometries/pois 沿用 Batch2
+ * （dmap-map-manifest/2 单图容器）发布时的实测值；vertices/triangles 自
+ * 「声明口径 = 载荷解码后实况」修复（issue #1）起改为逐层 Draco 解码后的
+ * 真实几何求和（编码期量化去重与退化面剔除均已反映），此后任何重打包
+ * 不得再改变任何规模。
+ */
+const SCALE_BASELINE: Record<
   number,
   {
     chunks: number;
@@ -32,15 +38,15 @@ const BATCH2_BASELINE: Record<
   101: {
     chunks: 76,
     instances: 42830,
-    vertices: 4400193,
-    triangles: 3692271,
+    vertices: 3942714,
+    triangles: 3692269,
     geometries: 2927,
     pois: 557,
   },
   102: {
     chunks: 139,
     instances: 52472,
-    vertices: 5896772,
+    vertices: 5338847,
     triangles: 4595775,
     geometries: 4542,
     pois: 688,
@@ -48,23 +54,23 @@ const BATCH2_BASELINE: Record<
   104: {
     chunks: 39,
     instances: 28045,
-    vertices: 3018988,
-    triangles: 2260560,
+    vertices: 2703990,
+    triangles: 2260559,
     geometries: 1829,
     pois: 803,
   },
   105: {
     chunks: 54,
     instances: 28079,
-    vertices: 4388334,
-    triangles: 3605045,
+    vertices: 3982758,
+    triangles: 3605039,
     geometries: 2277,
     pois: 915,
   },
   106: {
     chunks: 96,
     instances: 45595,
-    vertices: 6769100,
+    vertices: 6189234,
     triangles: 5316017,
     geometries: 3362,
     pois: 146,
@@ -72,8 +78,8 @@ const BATCH2_BASELINE: Record<
   203: {
     chunks: 48,
     instances: 23395,
-    vertices: 3157823,
-    triangles: 2476101,
+    vertices: 2842931,
+    triangles: 2476097,
     geometries: 2928,
     pois: 591,
   },
@@ -122,6 +128,22 @@ function stubAssetFetch(): void {
 
 /** GLB JSON 段的实例数（引擎口径：实例化 accessor count 之和 + 非实例网格节点 1/个）。 */
 function glbInstanceCount(glb: Uint8Array): number {
+  const counts = glbGeometryCounts(glb);
+  return counts.instanceCount;
+}
+
+/**
+ * GLB JSON 段的几何规模（引擎/解码口径）：
+ * - positionCount：逐图元 POSITION accessor count 之和（网格压缩 GLB 中
+ *   该占位 accessor 与解码产物一致，即解码后顶点数）；
+ * - indexCount：逐图元索引 accessor count 之和（= 3 × 解码后三角形数）；
+ * - instanceCount：实例化 accessor count 之和 + 非实例网格节点 1/个。
+ */
+function glbGeometryCounts(glb: Uint8Array): {
+  positionCount: number;
+  indexCount: number;
+  instanceCount: number;
+} {
   const view = new DataView(glb.buffer, glb.byteOffset, glb.byteLength);
   let offset = 12;
   for (;;) {
@@ -132,24 +154,36 @@ function glbInstanceCount(glb: Uint8Array): number {
         new TextDecoder().decode(new Uint8Array(glb.buffer, glb.byteOffset + offset + 8, len)),
       );
       const accessors = json.accessors ?? [];
-      let count = 0;
+      let positionCount = 0;
+      let indexCount = 0;
+      let instanceCount = 0;
+      for (const mesh of json.meshes ?? []) {
+        for (const primitive of mesh.primitives ?? []) {
+          if (primitive.attributes?.POSITION !== undefined) {
+            positionCount += accessors[primitive.attributes.POSITION]?.count ?? 0;
+          }
+          if (primitive.indices !== undefined) {
+            indexCount += accessors[primitive.indices]?.count ?? 0;
+          }
+        }
+      }
       for (const node of json.nodes ?? []) {
         const ext = node.extensions?.EXT_mesh_gpu_instancing;
         if (ext) {
           const firstAccessor = Object.values(ext.attributes ?? {})[0] as number | undefined;
-          count += firstAccessor === undefined ? 0 : (accessors[firstAccessor]?.count ?? 0);
+          instanceCount += firstAccessor === undefined ? 0 : (accessors[firstAccessor]?.count ?? 0);
         } else if (node.mesh !== undefined) {
-          count += 1;
+          instanceCount += 1;
         }
       }
-      return count;
+      return { positionCount, indexCount, instanceCount };
     }
     offset += 8 + len;
     if (offset >= glb.byteLength) {
       break;
     }
   }
-  return -1;
+  throw new Error("GLB 缺少 JSON 段");
 }
 
 beforeEach(() => {
@@ -285,7 +319,7 @@ describe("loadMapBundle · 随仓真实分片数据包（6 图）", () => {
 
   // 逐图生成用例（it.for 为 vitest 私有 API，循环注册在 vitest 与 bun:test 下通用）。
   for (const [mapId, code] of MAPS.map((definition) => [definition.id, definition.code] as const)) {
-    it(`索引读回与 Batch2 基线一致（${mapId} / ${code}）`, async () => {
+    it(`索引读回与声明规模基线一致（${mapId} / ${code}）`, async () => {
       const bundle = await loadMapBundle(mapId);
       const definition = getMapById(mapId);
       expect(definition).toBeDefined();
@@ -293,9 +327,10 @@ describe("loadMapBundle · 随仓真实分片数据包（6 图）", () => {
       expect(bundle.manifest.floors).toEqual(definition?.knownFloors);
       expect(bundle.manifest.entries.scene).toBe(`maps/${code}/scene.json`);
 
-      // 分片重打包等价性：全部规模字段与 Batch2 单图容器基线逐项一致。
-      expect(bundle.manifest.counts).toEqual(BATCH2_BASELINE[mapId]);
-      expect(bundle.manifest.chunks).toHaveLength(BATCH2_BASELINE[mapId]!.chunks);
+      // 分片重打包等价性：全部规模字段与声明基线逐项一致
+      //（vertices/triangles 为解码后实况口径，见 SCALE_BASELINE 注释）。
+      expect(bundle.manifest.counts).toEqual(SCALE_BASELINE[mapId]);
+      expect(bundle.manifest.chunks).toHaveLength(SCALE_BASELINE[mapId]!.chunks);
 
       // 清单声明的资产路径全部在索引容器内真实存在。
       for (const path of [
@@ -403,6 +438,41 @@ describe("loadMapBundle · 随仓真实分片数据包（6 图）", () => {
       expect(String.fromCharCode(lod2[0], lod2[1], lod2[2], lod2[3])).toBe("glTF");
       expect(lod2.byteLength).toBe(sample.lods![2]!.bytesCompressed);
       expect(sumLodPayload).toBeGreaterThan(0);
+    });
+  }
+
+  /**
+   * v4 声明口径 = 解码后实况（采样）：清单 lods[] 声明的 vertices/triangles
+   * 与分块载荷解码后的真实几何一致，且逐层满足 indices == 3 × triangles
+   *（编码期量化去重与退化面剔除均已反映在声明值中）。全量 1356 层的
+   * 解码断言由管线侧终验脚本承担，此处对每图采样分块做随仓回归锚定。
+   */
+  for (const [mapId, code] of MAPS.map((definition) => [definition.id, definition.code] as const)) {
+    it(`v4 声明规模与解码载荷一致：indices == 3 × triangles（${mapId} / ${code}，采样）`, async () => {
+      const bundle = await loadMapBundle(mapId);
+      const chunks = bundle.manifest.chunks;
+      // 确定性采样：首 / 中 / 尾三个分块，各覆盖全部细节层。
+      const samples = [
+        chunks[0]!,
+        chunks[Math.floor(chunks.length / 2)]!,
+        chunks[chunks.length - 1]!,
+      ];
+      for (const chunk of samples) {
+        for (const lod of chunk.lods ?? []) {
+          const glb = await bundle.pkg.readChunkLod(chunk, lod.level);
+          const counts = glbGeometryCounts(glb);
+          expect(counts.positionCount, `${code}/${chunk.id} l${lod.level} vertices`).toBe(
+            lod.vertices,
+          );
+          expect(
+            counts.indexCount,
+            `${code}/${chunk.id} l${lod.level} indices == 3×triangles`,
+          ).toBe(3 * lod.triangles);
+          expect(counts.instanceCount, `${code}/${chunk.id} l${lod.level} instances`).toBe(
+            chunk.instances,
+          );
+        }
+      }
     });
   }
 

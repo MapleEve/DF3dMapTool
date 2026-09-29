@@ -23,6 +23,7 @@ import { ChunkGltfParser, disposeObject3D, splitInstancedMeshByFloor } from "./g
 import { deriveFloorBands, floorForY, type FloorBand } from "./floorBands";
 import type { FloorManager } from "./floorManager";
 import type { EngineLayer } from "./SceneManager";
+import { AssemblyQueue, defaultAssemblyScheduler, type AssemblyScheduler } from "./assemblyQueue";
 
 /**
  * 地图图层：清单驱动的分块流式加载/卸载 + 距离驱动的 LOD 分层。
@@ -37,8 +38,14 @@ import type { EngineLayer } from "./SceneManager";
  *   按到视线中心的距离排序、并发 6 路限流、失败自动重试（带指数退避），
  *   降级任务（纯内存回收）一律排在载入/升级之后；
  *   重试耗尽的分块进入指数冷却，避免持续失败时形成请求风暴；
- * - 换层复用已打开的层容器缓存（升级不重拉字节），旧层对象经
- *   disposeObject3D 释放几何/材质/纹理引用；
+ * - 池任务只负责拉取层容器（fetch + 解密 + 读载荷）；解析与装配
+ *   （GLB→场景、按层拆分、注册、旧层释放）交给帧预算装配队列
+ *   （assemblyQueue）分帧执行——容器完成回调的微任务级联里只做
+ *   状态翻转，避免批量换层窗口多个容器的收尾在同一任务窗内串联
+ *   形成主线程长任务；调度器可注入（测试/headless 同步排空）；
+ * - 离开应载集/层已过期的待装配条目在排空时被清扫丢弃，已解析场景
+ *   就地释放，不泄漏；换层复用已打开的层容器缓存（升级不重拉字节），
+ *   旧层对象经 disposeObject3D 释放几何/材质/纹理引用；
  * - 载入后按实例高度把网格拆进楼层组，交 FloorManager 管显隐；
  * - 进度按「当前应载集」口径：应载集 = 本轮规划保留的分块，
  *   分母为其实例份额（清单声明值，跨层一致），分子为其中已按
@@ -64,11 +71,16 @@ export interface MapSceneLayerOptions {
   readonly lodThresholds?: LodThresholds;
   /** LOD 分带迟滞余量（米），缺省 60。 */
   readonly lodHysteresis?: number;
+  /** 装配队列帧预算（毫秒）：每次排空用于解析启动与装配挂载的时间上限，缺省 6。 */
+  readonly assemblyBudgetMs?: number;
+  /** 装配队列排空调度器（缺省 rAF；测试可注入同步调度器立即排空）。 */
+  readonly assemblyScheduler?: AssemblyScheduler;
 }
 
 export interface ChunkStreamStats {
   /** 当前已挂载分块数（任意层级）。 */
   readonly loadedChunks: number;
+  /** 在途分块数：池内拉取 + 装配队列内（解析中/待装配）。 */
   readonly pendingChunks: number;
   readonly totalChunks: number;
   /** 应载集中已按期望层级或更细层级挂载的实例份额。 */
@@ -96,6 +108,8 @@ const DEFAULTS: Required<MapSceneLayerOptions> = {
   streamingInterval: 0.2,
   lodThresholds: [300, 600],
   lodHysteresis: 60,
+  assemblyBudgetMs: 6,
+  assemblyScheduler: defaultAssemblyScheduler,
 };
 
 /** 分块重试耗尽后的冷却基数（毫秒），按连续失败次数指数放大。 */
@@ -135,6 +149,10 @@ export class MapSceneLayer implements EngineLayer {
   readonly #frustum = new Frustum();
   readonly #projectionMatrix = new Matrix4();
   readonly #abort = new AbortController();
+  /** 帧预算装配队列：池任务拉到载荷后入队，解析/装配分帧执行。 */
+  readonly #assembly: AssemblyQueue<Object3D>;
+  /** 装配中条目的去重键集（chunk@层）；池任务在入队时即释放槽位。 */
+  readonly #pendingAssembly = new Set<string>();
 
   #camera: PerspectiveCamera | null = null;
   #focusProvider: (() => Vec3) | null = null;
@@ -175,6 +193,10 @@ export class MapSceneLayer implements EngineLayer {
       retries: this.#options.chunkRetries,
       retryDelayMs: this.#options.chunkRetryDelayMs,
     });
+    this.#assembly = new AssemblyQueue<Object3D>({
+      budgetMs: this.#options.assemblyBudgetMs,
+      scheduler: this.#options.assemblyScheduler,
+    });
 
     this.root.name = `map-${pkg.mapCode}`;
     this.root.add(this.#floorManager.root);
@@ -212,7 +234,7 @@ export class MapSceneLayer implements EngineLayer {
     }
     return {
       loadedChunks: this.#loaded.size,
-      pendingChunks: this.#pool.queuedCount + this.#pool.runningCount,
+      pendingChunks: this.#pool.queuedCount + this.#pool.runningCount + this.#assembly.pendingCount,
       totalChunks: this.#records.length,
       loadedInstances: loaded,
       totalInstances: total,
@@ -257,7 +279,10 @@ export class MapSceneLayer implements EngineLayer {
       if (this.#loaded.get(record.id)?.level === level) {
         continue;
       }
-      if (this.#pool.has(`${record.id}@${level}`)) {
+      if (
+        this.#pool.has(`${record.id}@${level}`) ||
+        this.#pendingAssembly.has(`${record.id}@${level}`)
+      ) {
         continue;
       }
       void this.#submitLoad(record, level, Number.POSITIVE_INFINITY);
@@ -273,6 +298,8 @@ export class MapSceneLayer implements EngineLayer {
       this.#timeSincePlan = 0;
       this.#plan();
     }
+    // 装配队列排空：与渲染帧合帧（预算内至少推进一项；空队列为常数开销）。
+    this.#assembly.tick();
   }
 
   dispose(): void {
@@ -282,6 +309,9 @@ export class MapSceneLayer implements EngineLayer {
     this.#disposed = true;
     this.#abort.abort();
     this.#pool.clear();
+    // 装配队列清空：待装配条目就地释放（parsing 条目解析完成后自行释放场景）。
+    this.#assembly.dispose();
+    this.#pendingAssembly.clear();
     for (const chunk of this.#loaded.values()) {
       this.#releaseChunkObjects(chunk);
     }
@@ -380,7 +410,10 @@ export class MapSceneLayer implements EngineLayer {
       if (mounted !== undefined && mounted.level === desiredLevel) {
         continue;
       }
-      if (this.#pool.has(`${id}@${desiredLevel}`)) {
+      if (
+        this.#pool.has(`${id}@${desiredLevel}`) ||
+        this.#pendingAssembly.has(`${id}@${desiredLevel}`)
+      ) {
         continue;
       }
       if ((this.#retryAfter.get(id) ?? 0) > now) {
@@ -403,7 +436,11 @@ export class MapSceneLayer implements EngineLayer {
     }
   }
 
-  /** 提交一个分块加载/换层任务（拉取对应层容器 → 解析 GLB → 楼层拆分挂载）。 */
+  /**
+   * 提交一个分块加载/换层任务。池任务只负责拉取层容器（fetch + 解密 +
+   * 读载荷字节）；解析与装配入帧预算队列分帧执行——容器完成回调的
+   * 微任务级联里只做状态翻转，批量换层窗口不再串联收尾工作。
+   */
   #submitLoad(record: ChunkRecord, level: number, priority: number): Promise<void> {
     const key = `${record.id}@${level}`;
     return this.#pool
@@ -415,53 +452,40 @@ export class MapSceneLayer implements EngineLayer {
         if (this.#disposed || this.#abort.signal.aborted) {
           return;
         }
-        const scene = await this.#parser.parseGlb(bytes);
-        if (this.#disposed || this.#abort.signal.aborted) {
-          disposeObject3D(scene);
-          return;
-        }
-        const desired = this.#desired.get(record.id);
-        const mounted = this.#loaded.get(record.id);
-        if (desired === undefined) {
-          // 规划期已离开应载集：直接丢弃解析结果。
-          disposeObject3D(scene);
-          return;
-        }
-        if (level !== desired && !(mounted === undefined && level > desired)) {
-          // 过期任务：目标层已被更细层满足（mounted 更细）或目标层
-          // 比当前需要的更细（相机已远离）——不挂载，避免无谓换层抖动。
-          disposeObject3D(scene);
-          return;
-        }
-        const parts: { object: Object3D; floor: number }[] = [];
-        // 实例份额在挂载前统计：register 会把对象移出解析场景，
-        // 挂载后再数 scene.children 会把单楼层分块（拆分原样返回原网格）
-        // 全部漏记成 0，进度口径随之失真。
-        for (const node of scene.children) {
-          if (node instanceof InstancedMesh) {
-            const splits = splitInstancedMeshByFloor(node, this.#bands);
-            if (splits.length > 1) {
-              // 拆分后原实例属性不再使用，主动释放
-              node.dispose();
+        this.#pendingAssembly.add(key);
+        this.#assembly.enqueue({
+          parse: () => this.#parser.parseGlb(bytes),
+          finalize: (scene) => {
+            this.#pendingAssembly.delete(key);
+            this.#finalizeChunk(record, level, scene);
+          },
+          onParseError: (error) => {
+            this.#pendingAssembly.delete(key);
+            this.#onChunkLoadFailure(record, level, error);
+          },
+          drop: (scene) => {
+            this.#pendingAssembly.delete(key);
+            if (scene !== null) {
+              disposeObject3D(scene);
             }
-            for (const part of splits) {
-              parts.push({ object: part.mesh, floor: part.floor });
+          },
+          // 机会性失效（每次排空前清扫）：离开应载集，或按挂载规则已无
+          // 挂载可能（目标层过期）——提前出队释放，不等装配时点。
+          isStale: () => {
+            if (this.#disposed) {
+              return true;
             }
-          } else {
-            parts.push({ object: node, floor: this.#floorForObject(node) });
-          }
-        }
-        // 换层：先释放旧层对象的 GPU 资源（几何/材质/纹理/实例属性）。
-        if (mounted !== undefined) {
-          this.#releaseChunkObjects(mounted);
-        }
-        for (const part of parts) {
-          this.#floorManager.register(part.object, part.floor);
-        }
-        this.#loaded.set(record.id, { id: record.id, level, parts });
-        this.#failureStreaks.delete(record.id);
-        this.#retryAfter.delete(record.id);
-        this.#emitProgress();
+            const desired = this.#desired.get(record.id);
+            if (desired === undefined) {
+              return true;
+            }
+            if (level === desired) {
+              return false;
+            }
+            const mounted = this.#loaded.get(record.id);
+            return !(mounted === undefined && level > desired);
+          },
+        });
       })
       .catch((error: unknown) => {
         if (error instanceof TaskCancelledError) {
@@ -471,21 +495,80 @@ export class MapSceneLayer implements EngineLayer {
         if (this.#disposed) {
           return;
         }
-        // 重试耗尽：进入指数冷却后再由规划重新提交，避免持续失败时
-        // 每 0.2s 重提同一分块形成请求风暴与错误刷屏。
-        const streak = (this.#failureStreaks.get(record.id) ?? 0) + 1;
-        this.#failureStreaks.set(record.id, streak);
-        const cooldownMs = Math.min(
-          FAILURE_COOLDOWN_BASE_MS * 2 ** (streak - 1),
-          FAILURE_COOLDOWN_MAX_MS,
-        );
-        this.#retryAfter.set(record.id, Date.now() + cooldownMs);
-        this.#emitProgress();
-        console.error(
-          `chunk ${record.id}@l${level} 加载失败（连续第 ${streak} 次，${Math.round(cooldownMs / 1000)}s 后重试）`,
-          error,
-        );
+        this.#onChunkLoadFailure(record, level, error);
       });
+  }
+
+  /** 装配段：解析结果 → 楼层拆分 → 换层释放旧对象 → 注册挂载（帧预算内执行）。 */
+  #finalizeChunk(record: ChunkRecord, level: number, scene: Object3D): void {
+    const desired = this.#desired.get(record.id);
+    const mounted = this.#loaded.get(record.id);
+    if (this.#disposed || desired === undefined) {
+      // 规划期已离开应载集：直接丢弃解析结果。
+      disposeObject3D(scene);
+      return;
+    }
+    if (level !== desired && !(mounted === undefined && level > desired)) {
+      // 过期任务：目标层已被更细层满足（mounted 更细）或目标层
+      // 比当前需要的更细（相机已远离）——不挂载，避免无谓换层抖动。
+      disposeObject3D(scene);
+      return;
+    }
+    if (mounted !== undefined && mounted.level === level) {
+      // 同层已在位（防御：正常规划不会对同层重复装配）。
+      disposeObject3D(scene);
+      return;
+    }
+    const parts: { object: Object3D; floor: number }[] = [];
+    // 实例份额在挂载前统计：register 会把对象移出解析场景，
+    // 挂载后再数 scene.children 会把单楼层分块（拆分原样返回原网格）
+    // 全部漏记成 0，进度口径随之失真。
+    for (const node of scene.children) {
+      if (node instanceof InstancedMesh) {
+        const splits = splitInstancedMeshByFloor(node, this.#bands);
+        if (splits.length > 1) {
+          // 拆分后原实例属性不再使用，主动释放
+          node.dispose();
+        }
+        for (const part of splits) {
+          parts.push({ object: part.mesh, floor: part.floor });
+        }
+      } else {
+        parts.push({ object: node, floor: this.#floorForObject(node) });
+      }
+    }
+    // 换层：先释放旧层对象的 GPU 资源（几何/材质/纹理/实例属性）。
+    if (mounted !== undefined) {
+      this.#releaseChunkObjects(mounted);
+    }
+    for (const part of parts) {
+      this.#floorManager.register(part.object, part.floor);
+    }
+    this.#loaded.set(record.id, { id: record.id, level, parts });
+    this.#failureStreaks.delete(record.id);
+    this.#retryAfter.delete(record.id);
+    this.#emitProgress();
+  }
+
+  /** 分块装载失败（拉取重试耗尽 / 解析失败）：指数冷却后再由规划重新提交。 */
+  #onChunkLoadFailure(record: ChunkRecord, level: number, error: unknown): void {
+    if (this.#disposed) {
+      return;
+    }
+    // 重试耗尽：进入指数冷却后再由规划重新提交，避免持续失败时
+    // 每 0.2s 重提同一分块形成请求风暴与错误刷屏。
+    const streak = (this.#failureStreaks.get(record.id) ?? 0) + 1;
+    this.#failureStreaks.set(record.id, streak);
+    const cooldownMs = Math.min(
+      FAILURE_COOLDOWN_BASE_MS * 2 ** (streak - 1),
+      FAILURE_COOLDOWN_MAX_MS,
+    );
+    this.#retryAfter.set(record.id, Date.now() + cooldownMs);
+    this.#emitProgress();
+    console.error(
+      `chunk ${record.id}@l${level} 加载失败（连续第 ${streak} 次，${Math.round(cooldownMs / 1000)}s 后重试）`,
+      error,
+    );
   }
 
   #floorForObject(node: Object3D): number {
